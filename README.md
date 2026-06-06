@@ -1,4 +1,5 @@
 # Knob Swipe Navigation
+[![HACS][hacs-badge]][hacs-url] [![release][release-badge]][release-url] ![downloads][downloads-badge] [![hassfest][hassfest-badge]][hassfest-url] [![validate][validate-badge]][validate-url] [![license][license-badge]][license-url]
 
 Knob Swipe Navigation is a Home Assistant custom integration that lets a ZHA rotary knob change Lovelace dashboard tabs. It listens for `zha_event` rotation events from one configured ZHA device and performs in-browser dashboard navigation on dashboards that explicitly opt in.
 
@@ -61,6 +62,8 @@ The integration does not create entities, service actions, device triggers, or l
 
 ## HACS Installation
 
+[![Open the Knob Swipe Navigation HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=moryoav&repository=ha-knob-navigation&category=integration)
+
 Until this repository is accepted as a default HACS repository, add it as a custom repository:
 
 1. Open HACS.
@@ -72,6 +75,8 @@ Until this repository is accepted as a default HACS repository, add it as a cust
 7. Restart Home Assistant.
 
 After restart, add the integration in Home Assistant:
+
+[![Add the Knob Swipe Navigation integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=knob_swipe_navigation)
 
 1. Go to **Settings -> Devices & services -> Add integration**.
 2. Search for **Knob Swipe Navigation**.
@@ -366,3 +371,19 @@ If you need to report a problem:
 ## Quality Scale
 
 The integration declares `quality_scale: gold` in its manifest and tracks the Home Assistant Integration Quality Scale rules in `custom_components/knob_swipe_navigation/quality_scale.yaml`.
+
+## License
+
+Knob Swipe Navigation is released under the [MIT License](LICENSE).
+
+[hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square
+[hacs-url]: https://github.com/hacs/integration
+[release-badge]: https://img.shields.io/github/v/release/moryoav/ha-knob-navigation?style=flat-square
+[release-url]: https://github.com/moryoav/ha-knob-navigation/releases
+[downloads-badge]: https://img.shields.io/github/downloads/moryoav/ha-knob-navigation/total?style=flat-square
+[hassfest-badge]: https://img.shields.io/github/actions/workflow/status/moryoav/ha-knob-navigation/hassfest.yaml?branch=main&style=flat-square&label=hassfest
+[hassfest-url]: https://github.com/moryoav/ha-knob-navigation/actions/workflows/hassfest.yaml
+[validate-badge]: https://img.shields.io/github/actions/workflow/status/moryoav/ha-knob-navigation/validate.yaml?branch=main&style=flat-square&label=validate
+[validate-url]: https://github.com/moryoav/ha-knob-navigation/actions/workflows/validate.yaml
+[license-badge]: https://img.shields.io/github/license/moryoav/ha-knob-navigation?style=flat-square
+[license-url]: https://github.com/moryoav/ha-knob-navigation/blob/main/LICENSE
