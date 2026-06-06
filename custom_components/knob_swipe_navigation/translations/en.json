@@ -1,0 +1,34 @@
+{
+  "title": "Knob Swipe Navigation",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Knob Swipe Navigation",
+        "description": "Choose the ZHA rotary knob device that should control enabled dashboards.",
+        "data": {
+          "device_id": "ZHA knob device"
+        }
+      }
+    },
+    "error": {
+      "not_zha_device": "Select a device provided by ZHA."
+    },
+    "abort": {
+      "already_configured": "Knob Swipe Navigation is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Knob Swipe Navigation Options",
+        "description": "Choose the ZHA rotary knob device that should control enabled dashboards.",
+        "data": {
+          "device_id": "ZHA knob device"
+        }
+      }
+    },
+    "error": {
+      "not_zha_device": "Select a device provided by ZHA."
+    }
+  }
+}
