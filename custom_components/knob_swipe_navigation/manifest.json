@@ -1,22 +1,22 @@
 {
   "domain": "knob_swipe_navigation",
   "name": "Knob Swipe Navigation",
-  "version": "0.1.1",
-  "documentation": "https://github.com/moryoav/ha-knob-navigation",
-  "issue_tracker": "https://github.com/moryoav/ha-knob-navigation/issues",
+  "after_dependencies": [
+    "zha"
+  ],
   "codeowners": [
     "@moryoav"
   ],
   "config_flow": true,
-  "single_config_entry": true,
-  "after_dependencies": [
-    "zha"
-  ],
   "dependencies": [
     "frontend",
     "http"
   ],
+  "documentation": "https://github.com/moryoav/ha-knob-navigation",
   "integration_type": "service",
   "iot_class": "local_push",
-  "quality_scale": "gold"
+  "issue_tracker": "https://github.com/moryoav/ha-knob-navigation/issues",
+  "quality_scale": "gold",
+  "single_config_entry": true,
+  "version": "0.1.1"
 }
