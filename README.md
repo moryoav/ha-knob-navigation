@@ -1,7 +1,7 @@
 # Knob Swipe Navigation
 [![HACS][hacs-badge]][hacs-url] [![release][release-badge]][release-url] ![downloads][downloads-badge] [![hassfest][hassfest-badge]][hassfest-url] [![validate][validate-badge]][validate-url] [![license][license-badge]][license-url]
 
-Knob Swipe Navigation is a Home Assistant custom integration that lets a ZHA rotary knob change Lovelace dashboard tabs. It listens for `zha_event` rotation events from one configured ZHA device and performs in-browser dashboard navigation on dashboards that explicitly opt in.
+Knob Swipe Navigation is a Home Assistant custom integration that lets one configured ZHA rotary knob change tabs on one configured Lovelace dashboard. The selected dashboard and navigation behavior are configured from **Settings -> Devices & services**; no dashboard YAML block or template helper is required.
 
 This version supports ZHA rotation only:
 
@@ -15,11 +15,9 @@ This version supports ZHA rotation only:
 - Home Assistant with ZHA configured.
 - A ZHA rotary knob that fires `zha_event` events with `command: rotate_type`.
 - A Lovelace dashboard using storage mode or YAML mode.
-- A browser displaying the dashboard.
+- A browser displaying the configured dashboard.
 
-Fully Kiosk Browser is not a hard requirement. The integration runs in the Home Assistant frontend and can work in any browser that has the enabled dashboard open. Fully Kiosk is useful for wall tablets because it provides a stable always-on browser, kiosk URL handling, screenshots, screensaver control, and device management, but the knob navigation logic itself does not require Fully.
-
-The classic `hass-swipe-navigation` component is also not a hard requirement. This integration includes its own event listener, overlay, tab metadata lookup, and navigation fallback. If `hass-swipe-navigation` is already installed, this integration can coexist with its existing `swipe_nav` dashboard config.
+Fully Kiosk Browser is not a hard requirement. The integration runs in the Home Assistant frontend and can work in any browser showing the configured dashboard. Fully Kiosk is useful for wall tablets because it provides a stable always-on browser, kiosk URL handling, screenshots, screensaver control, and device management, but the knob navigation logic itself does not require Fully.
 
 ## Supported Devices
 
@@ -49,16 +47,16 @@ Unsupported devices and modes:
 The integration provides:
 
 - UI setup from **Settings -> Devices & services**.
-- UI reconfiguration so the selected knob can be changed without removing the integration.
+- UI reconfiguration for the selected knob and dashboard path.
 - One Home Assistant service device for the navigation bridge.
-- Diagnostics download with redacted config entry data and selected-device metadata.
+- A frontend module that subscribes to ZHA events and navigates the configured dashboard.
+- Config entities for enablement, overlay, wrap, overlay timeout, and cooldown.
+- Diagnostic event/sensor entities for knob rotation and frontend navigation results.
+- Diagnostics download with redacted config entry data, settings, entity IDs, and selected-device metadata.
 - A repair issue if the configured knob is no longer provided by ZHA.
-- A frontend module that subscribes to ZHA events and navigates enabled dashboards.
-- Optional tab overlay using real Lovelace tab names and icons.
 - Optional browser targeting with a required URL query parameter.
-- Optional suppression while a chosen Home Assistant entity is `on`.
 
-The integration does not create entities, service actions, device triggers, or long-term statistics.
+The integration does not create service actions, device triggers, or long-term statistics.
 
 ## HACS Installation
 
@@ -81,9 +79,9 @@ After restart, add the integration in Home Assistant:
 1. Go to **Settings -> Devices & services -> Add integration**.
 2. Search for **Knob Swipe Navigation**.
 3. Select the ZHA rotary knob device.
-4. Finish setup.
-
-The only installation parameter is **ZHA knob device**. It must be a device already owned by the ZHA integration.
+4. Enter the dashboard path to control, for example `lovelace` or `dashboard-home`.
+5. Choose overlay, cooldown, wrap, and optional URL query targeting settings.
+6. Finish setup.
 
 ## Manual Installation
 
@@ -100,11 +98,16 @@ __init__.py
 config_flow.py
 const.py
 diagnostics.py
+entity.py
+event.py
 helpers.py
 manifest.json
 models.py
+number.py
 quality_scale.yaml
+sensor.py
 strings.json
+switch.py
 translations/en.json
 www/knob-swipe-navigation.js
 brand/icon.png
@@ -113,158 +116,76 @@ brand/logo.png
 
 Restart Home Assistant, then add the integration from **Settings -> Devices & services**.
 
-## Reconfiguration and Removal
+## Configuration
 
-To select a different knob:
+The selected dashboard is configured by path. Use the first URL segment of the dashboard:
 
-1. Go to **Settings -> Devices & services**.
-2. Open **Knob Swipe Navigation**.
-3. Choose **Reconfigure**.
-4. Select another ZHA rotary knob device.
+- `/lovelace/home` -> `lovelace`
+- `/dashboard-home/default_view?kiosk` -> `dashboard-home`
+- A full URL such as `http://homeassistant.local:8123/kitchen/0` -> `kitchen`
 
-To remove the integration:
+All normal, visible tabs in that dashboard are affected. Subviews and hidden views are skipped.
 
-1. Remove `knob_swipe_navigation` or `swipe_nav.knob` blocks from every dashboard.
-2. Remove **Knob Swipe Navigation** from **Settings -> Devices & services**.
-3. If installed with HACS, uninstall it from HACS and restart Home Assistant.
-4. If installed manually, delete `config/custom_components/knob_swipe_navigation/` and restart Home Assistant.
-5. Reload any browser or wall tablet that previously displayed an enabled dashboard.
+Settings available from setup, reconfigure, and options:
 
-## Dashboard Setup
+- **Dashboard path**: The dashboard that reacts to the knob.
+- **Navigation enabled**: Global on/off control for knob navigation.
+- **Overlay enabled**: Shows the tab overlay before moving tabs.
+- **Overlay timeout**: Overlay visibility in milliseconds. Defaults to `2800`.
+- **Cooldown**: Ignores repeated rotations for this many milliseconds. Defaults to `0`.
+- **Wrap tabs**: Allows moving from last to first tab and first to last tab.
+- **Required URL query parameter**: Optional browser targeting guard.
 
-The frontend module loads globally, but it only reacts on dashboards that opt in.
+## Entities
 
-For a new installation, use the standalone root config:
+The integration creates these entities on its service device:
 
-```yaml
-knob_swipe_navigation:
-  enable: true
-  overlay: true
-  overlay_timeout: 2800
-```
+- `switch.navigation_enabled`: Main enable/pause control.
+- `switch.overlay_enabled`: Shows or hides the tab overlay.
+- `switch.wrap_tabs`: Enables tab wrapping.
+- `number.overlay_timeout`: Overlay timeout in milliseconds.
+- `number.cooldown`: Rotation cooldown in milliseconds.
+- `event.rotation`: Fires `next` or `previous` when the selected knob rotates.
+- `sensor.last_rotation`: Last selected-knob rotation direction.
+- `sensor.last_navigation_result`: Last frontend navigation result reported by a browser.
 
-If the dashboard already uses `hass-swipe-navigation`, you can instead place the knob config under the existing `swipe_nav` block:
-
-```yaml
-swipe_nav:
-  wrap: true
-  animate: swipe
-  knob:
-    enable: true
-    overlay: true
-    overlay_timeout: 2800
-```
-
-After saving the dashboard, reload the browser showing that dashboard.
+Entity IDs can be renamed by Home Assistant. Use the entity registry values from your system when creating automations.
 
 ## Browser Targeting
 
-If you only want a specific kiosk, tablet, or browser URL to react to the knob, add a URL query requirement.
+If only one kiosk, tablet, or browser URL should react, configure **Required URL query parameter**.
 
-Standalone config:
-
-```yaml
-knob_swipe_navigation:
-  enable: true
-  overlay: true
-  overlay_timeout: 2800
-  require_query_param: kiosk
-```
-
-Then open the dashboard on the intended browser with `?kiosk` in the URL, for example:
+For example, set the required query parameter to `kiosk`, then open the intended dashboard as:
 
 ```text
 /dashboard-home/default_view?kiosk
 ```
 
-`require_query_param: kiosk` means: only react if the current browser URL contains a query parameter named `kiosk`. Both `?kiosk` and `?kiosk=1` match. The value is not checked.
+Both `?kiosk` and `?kiosk=1` match. The value is not checked. This is a browser-targeting guard, not a security feature; any browser opened with the same query parameter can react.
 
-This is a browser-targeting guard, not a security feature. Any browser opened with the same query parameter can react.
+## Reconfiguration and Removal
 
-## Configuration Parameters
+To select a different knob or dashboard:
 
-```yaml
-knob_swipe_navigation:
-  enable: true
-  overlay: true
-  overlay_timeout: 2800
-  cooldown_ms: 2000
-  require_query_param: kiosk
-  suppress_if_entity_on: input_boolean.pause_knob_navigation
-```
+1. Go to **Settings -> Devices & services**.
+2. Open **Knob Swipe Navigation**.
+3. Choose **Reconfigure** or **Configure**.
+4. Update the ZHA knob, dashboard path, or navigation settings.
 
-- `enable`: Required. Turns knob handling on for this dashboard.
-- `overlay`: Shows the tab overlay before moving tabs. Defaults to `true`.
-- `overlay_timeout`: Overlay visibility in milliseconds. Defaults to `2800`.
-- `cooldown_ms`: Ignores additional rotation events during this period. Defaults to `0`.
-- `require_query_param`: Only react when the current browser URL contains this query parameter name.
-- `suppress_if_entity_on`: Ignore knob events while the named Home Assistant entity is `on`.
+To remove the integration:
 
-## Use Cases
-
-- Wall tablet dashboard navigation without touching the tablet.
-- Kitchen, hallway, or bedside dashboards where a small rotary control is easier than swiping.
-- Family dashboards where tab names and icons should appear briefly before navigation.
-- Migration from an old knob automation while keeping a suppression guard available.
-- Shared dashboards where only a kiosk URL should react to the knob.
-
-## Examples
-
-Dashboard with a short overlay and a kiosk-only URL:
-
-```yaml
-knob_swipe_navigation:
-  enable: true
-  overlay: true
-  overlay_timeout: 1800
-  require_query_param: kiosk
-```
-
-Dashboard that pauses knob navigation while a helper is on:
-
-```yaml
-knob_swipe_navigation:
-  enable: true
-  overlay: true
-  suppress_if_entity_on: input_boolean.pause_knob_navigation
-```
-
-Example helper and automations for pausing navigation while a tablet screen is off:
-
-```yaml
-input_boolean:
-  pause_knob_navigation:
-    name: Pause knob navigation
-
-automation:
-  - alias: Pause knob navigation while tablet screen is off
-    triggers:
-      - trigger: state
-        entity_id: binary_sensor.wall_tablet_screen
-        to: "off"
-    actions:
-      - action: input_boolean.turn_on
-        target:
-          entity_id: input_boolean.pause_knob_navigation
-
-  - alias: Resume knob navigation while tablet screen is on
-    triggers:
-      - trigger: state
-        entity_id: binary_sensor.wall_tablet_screen
-        to: "on"
-    actions:
-      - action: input_boolean.turn_off
-        target:
-          entity_id: input_boolean.pause_knob_navigation
-```
+1. Remove **Knob Swipe Navigation** from **Settings -> Devices & services**.
+2. If installed with HACS, uninstall it from HACS and restart Home Assistant.
+3. If installed manually, delete `config/custom_components/knob_swipe_navigation/` and restart Home Assistant.
+4. Reload any browser or wall tablet that previously displayed the configured dashboard.
 
 ## Data Updates
 
-The backend stores the selected ZHA device id in the config entry. That value changes only when the integration is set up, migrated, or reconfigured.
+The backend stores the selected ZHA device ID and navigation settings in the config entry. The frontend receives those values through a Home Assistant WebSocket command, subscribes to `zha_event`, and performs navigation in the browser. Rotation handling is event-driven; there is no polling interval.
 
-The frontend receives the selected device id through a Home Assistant WebSocket command, then subscribes to `zha_event`. Rotation handling is event-driven; there is no polling interval.
+The backend also listens to the selected knob's `zha_event` events so the `event.rotation` and `sensor.last_rotation` entities update even when no browser navigates. Browsers report navigation results back to the backend for `sensor.last_navigation_result`.
 
-Dashboard tab metadata is read from the currently loaded Lovelace config. If you rename tabs, change paths, change icons, or change the dashboard knob config, reload the browser that is showing the dashboard.
+Dashboard tab metadata is read from the currently loaded Lovelace config. If you rename tabs, change paths, change icons, change the selected dashboard path, change the selected knob, or change URL query targeting, reload the browser that is showing the dashboard. The switch and number entities are read live from Home Assistant state and do not need a browser reload.
 
 ## Diagnostics
 
@@ -272,38 +193,40 @@ Diagnostics can be downloaded from the integration entry in **Settings -> Device
 
 - Redacted config entry data and options.
 - Frontend module URL.
+- Navigation settings.
+- Integration entity IDs.
 - Whether the selected device is configured and found.
 - Selected device name, manufacturer, model, and linked config entry domains.
 
-Diagnostics do not include tokens, passwords, coordinates, or the raw configured Home Assistant device id.
+Diagnostics do not include tokens, passwords, coordinates, or the raw configured Home Assistant device ID.
 
 ## How It Works
-
-The backend integration stores the selected ZHA device id and exposes it to the frontend through a Home Assistant WebSocket command.
 
 The frontend module:
 
 1. Loads in Home Assistant as a frontend JavaScript module.
-2. Reads the configured ZHA knob device id from the backend.
+2. Reads the configured ZHA knob device ID, dashboard path, settings, and entity IDs from the backend.
 3. Subscribes to `zha_event`.
 4. Ignores events from every other device.
-5. Checks whether the current dashboard has `knob_swipe_navigation.enable: true` or `swipe_nav.knob.enable: true`.
+5. Ignores browsers that are not displaying the configured dashboard path.
 6. Reads the real Lovelace tab names, paths, and icons from the current dashboard.
-7. Shows an overlay using those real tab names and icons.
+7. Shows an overlay using those real tab names and icons when enabled.
 8. Moves to the next or previous tab.
+9. Reports the navigation result back to Home Assistant.
 
 Because tab metadata is read from the loaded Lovelace dashboard, renaming tabs or changing icons automatically updates the overlay after the dashboard is reloaded.
 
 ## Testing
 
-After setup, rotate the knob while the enabled dashboard is visible.
+After setup, rotate the knob while the configured dashboard is visible.
 
 Expected behavior:
 
 - Rotating right moves to the next dashboard tab.
 - Rotating left moves to the previous dashboard tab.
-- The overlay appears immediately and highlights the target tab.
-- Browsers that do not match the dashboard opt-in or query requirement do not react.
+- The overlay appears immediately and highlights the target tab when overlay is enabled.
+- Browsers outside the configured dashboard path do not react.
+- Browsers missing the configured URL query parameter do not react.
 
 You can also simulate a rotation event from **Developer Tools -> Events** by firing `zha_event` with data like:
 
@@ -337,15 +260,16 @@ If setup or startup reports that the selected knob device is unavailable:
 If rotation does nothing:
 
 - Confirm the integration is configured and loaded in Devices & services.
+- Confirm `switch.navigation_enabled` is on.
 - Confirm the selected device is the actual ZHA knob.
-- Confirm the dashboard has `knob_swipe_navigation.enable: true` or `swipe_nav.knob.enable: true`.
-- If using `require_query_param`, confirm the browser URL contains that query parameter.
-- Confirm any entity listed in `suppress_if_entity_on` is not `on`.
+- Confirm the browser is showing the configured dashboard path.
+- If using URL query targeting, confirm the browser URL contains that query parameter.
 - Use **Developer Tools -> Events** to listen for `zha_event` and confirm the knob emits `command: rotate_type`.
+- Check `event.rotation`, `sensor.last_rotation`, and `sensor.last_navigation_result`.
 
 If multiple browsers react:
 
-- Add `require_query_param: kiosk` or another unique query parameter.
+- Configure a required query parameter such as `kiosk`.
 - Open only the intended browser with that query parameter.
 
 If tab names or icons look wrong:
@@ -357,15 +281,15 @@ If you need to report a problem:
 
 - Download diagnostics from the integration entry.
 - Include the simulated `zha_event` payload, with the `device_id` redacted if desired.
-- Include the dashboard knob config block.
+- Include the configured dashboard path and relevant entity states.
 
 ## Current Limitations
 
 - ZHA only.
 - Rotation only.
 - Press actions are not handled.
-- The configured knob is global, while dashboard activation is per dashboard.
-- `require_query_param` targets browsers by URL only; it does not identify a physical device.
+- One configured dashboard path is supported.
+- URL query targeting identifies browser URLs only; it does not identify a physical device.
 - The integration does not update knob firmware or software; ZHA and the device manufacturer handle that.
 
 ## Quality Scale

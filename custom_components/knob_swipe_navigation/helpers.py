@@ -2,10 +2,37 @@
 
 from __future__ import annotations
 
+from typing import Any
+from urllib.parse import urlparse
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+
+from .const import (
+    CONF_COOLDOWN_MS,
+    CONF_DASHBOARD_PATH,
+    CONF_NAVIGATION_ENABLED,
+    CONF_OVERLAY_ENABLED,
+    CONF_OVERLAY_TIMEOUT_MS,
+    CONF_REQUIRE_QUERY_PARAM,
+    CONF_WRAP_ENABLED,
+    DEFAULT_COOLDOWN_MS,
+    DEFAULT_DASHBOARD_PATH,
+    DEFAULT_NAVIGATION_ENABLED,
+    DEFAULT_OVERLAY_ENABLED,
+    DEFAULT_OVERLAY_TIMEOUT_MS,
+    DEFAULT_REQUIRE_QUERY_PARAM,
+    DEFAULT_WRAP_ENABLED,
+    MAX_COOLDOWN_MS,
+    MAX_OVERLAY_TIMEOUT_MS,
+    MIN_COOLDOWN_MS,
+    MIN_OVERLAY_TIMEOUT_MS,
+    SIGNAL_NAVIGATION_RESULT,
+    SIGNAL_ROTATION,
+)
+from .models import KnobSwipeNavigationConfigEntry, KnobSwipeNavigationSettings
 
 ZHA_DOMAIN = "zha"
 
@@ -13,6 +40,103 @@ ZHA_DOMAIN = "zha"
 def configured_device_id(entry: ConfigEntry) -> str | None:
     """Return the configured knob device id from a config entry."""
     return entry.data.get(CONF_DEVICE_ID) or entry.options.get(CONF_DEVICE_ID)
+
+
+def normalize_dashboard_path(value: Any) -> str:
+    """Normalize a dashboard URL/path to the first URL path segment."""
+    if not isinstance(value, str):
+        return DEFAULT_DASHBOARD_PATH
+
+    raw_value = value.strip()
+    if not raw_value:
+        return DEFAULT_DASHBOARD_PATH
+
+    parsed = urlparse(raw_value)
+    path = parsed.path if parsed.scheme or parsed.netloc else raw_value
+    path = path.split("?", 1)[0].split("#", 1)[0].strip("/")
+    return path.split("/", 1)[0] or DEFAULT_DASHBOARD_PATH
+
+
+def _coerce_bool(value: Any, default: bool) -> bool:
+    """Return a bool from stored options."""
+    if isinstance(value, bool):
+        return value
+    return default
+
+
+def _coerce_int(value: Any, default: int, minimum: int, maximum: int) -> int:
+    """Return a clamped integer from stored options."""
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, parsed))
+
+
+def settings_from_mapping(options: dict[str, Any]) -> KnobSwipeNavigationSettings:
+    """Return normalized navigation settings from an options mapping."""
+    query_param = options.get(CONF_REQUIRE_QUERY_PARAM, DEFAULT_REQUIRE_QUERY_PARAM)
+    if not isinstance(query_param, str):
+        query_param = DEFAULT_REQUIRE_QUERY_PARAM
+
+    return KnobSwipeNavigationSettings(
+        dashboard_path=normalize_dashboard_path(options.get(CONF_DASHBOARD_PATH)),
+        navigation_enabled=_coerce_bool(
+            options.get(CONF_NAVIGATION_ENABLED), DEFAULT_NAVIGATION_ENABLED
+        ),
+        overlay_enabled=_coerce_bool(
+            options.get(CONF_OVERLAY_ENABLED), DEFAULT_OVERLAY_ENABLED
+        ),
+        overlay_timeout_ms=_coerce_int(
+            options.get(CONF_OVERLAY_TIMEOUT_MS),
+            DEFAULT_OVERLAY_TIMEOUT_MS,
+            MIN_OVERLAY_TIMEOUT_MS,
+            MAX_OVERLAY_TIMEOUT_MS,
+        ),
+        cooldown_ms=_coerce_int(
+            options.get(CONF_COOLDOWN_MS),
+            DEFAULT_COOLDOWN_MS,
+            MIN_COOLDOWN_MS,
+            MAX_COOLDOWN_MS,
+        ),
+        wrap_enabled=_coerce_bool(options.get(CONF_WRAP_ENABLED), DEFAULT_WRAP_ENABLED),
+        require_query_param=query_param.strip(),
+    )
+
+
+def settings_from_entry(
+    entry: KnobSwipeNavigationConfigEntry,
+) -> KnobSwipeNavigationSettings:
+    """Return normalized navigation settings from a config entry."""
+    return settings_from_mapping(dict(entry.options))
+
+
+def settings_to_options(settings: KnobSwipeNavigationSettings) -> dict[str, Any]:
+    """Return config entry options from settings."""
+    return {
+        CONF_DASHBOARD_PATH: settings.dashboard_path,
+        CONF_NAVIGATION_ENABLED: settings.navigation_enabled,
+        CONF_OVERLAY_ENABLED: settings.overlay_enabled,
+        CONF_OVERLAY_TIMEOUT_MS: settings.overlay_timeout_ms,
+        CONF_COOLDOWN_MS: settings.cooldown_ms,
+        CONF_WRAP_ENABLED: settings.wrap_enabled,
+        CONF_REQUIRE_QUERY_PARAM: settings.require_query_param,
+    }
+
+
+def update_runtime_settings(entry: KnobSwipeNavigationConfigEntry) -> None:
+    """Refresh runtime settings from config entry options."""
+    entry.runtime_data.settings = settings_from_entry(entry)
+
+
+def rotation_signal(entry_id: str) -> str:
+    """Return the rotation dispatcher signal for a config entry."""
+    return f"{SIGNAL_ROTATION}_{entry_id}"
+
+
+def navigation_result_signal(entry_id: str) -> str:
+    """Return the navigation-result dispatcher signal for a config entry."""
+    return f"{SIGNAL_NAVIGATION_RESULT}_{entry_id}"
 
 
 def is_zha_device(hass: HomeAssistant, device_id: str) -> bool:

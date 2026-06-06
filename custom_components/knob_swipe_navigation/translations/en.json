@@ -9,22 +9,50 @@
     "step": {
       "user": {
         "title": "Knob Swipe Navigation",
-        "description": "Choose the ZHA rotary knob device that should control enabled dashboards.",
+        "description": "Choose the ZHA rotary knob device and the dashboard it should control.",
         "data": {
-          "device_id": "ZHA knob device"
+          "device_id": "ZHA knob device",
+          "dashboard_path": "Dashboard path",
+          "navigation_enabled": "Navigation enabled",
+          "overlay_enabled": "Overlay enabled",
+          "overlay_timeout_ms": "Overlay timeout",
+          "cooldown_ms": "Cooldown",
+          "wrap_enabled": "Wrap tabs",
+          "require_query_param": "Required URL query parameter"
         },
         "data_description": {
-          "device_id": "Only devices already provided by the ZHA integration can be used. Choose the rotary knob that emits rotate_type events."
+          "device_id": "Only devices already provided by the ZHA integration can be used. Choose the rotary knob that emits rotate_type events.",
+          "dashboard_path": "Use the first dashboard URL segment, for example lovelace or dashboard-home. Full dashboard URLs are also accepted.",
+          "navigation_enabled": "Turn knob navigation on or off globally.",
+          "overlay_enabled": "Show the tab overlay before moving tabs.",
+          "overlay_timeout_ms": "Overlay visibility in milliseconds.",
+          "cooldown_ms": "Ignore repeated rotations for this many milliseconds.",
+          "wrap_enabled": "Move from the last tab to the first tab, and from the first tab to the last tab.",
+          "require_query_param": "Optional. If set, only browser URLs containing this query parameter react."
         }
       },
       "reconfigure": {
         "title": "Reconfigure Knob Swipe Navigation",
-        "description": "Choose the ZHA rotary knob device that should control enabled dashboards.",
+        "description": "Choose the ZHA rotary knob device and the dashboard it should control.",
         "data": {
-          "device_id": "ZHA knob device"
+          "device_id": "ZHA knob device",
+          "dashboard_path": "Dashboard path",
+          "navigation_enabled": "Navigation enabled",
+          "overlay_enabled": "Overlay enabled",
+          "overlay_timeout_ms": "Overlay timeout",
+          "cooldown_ms": "Cooldown",
+          "wrap_enabled": "Wrap tabs",
+          "require_query_param": "Required URL query parameter"
         },
         "data_description": {
-          "device_id": "Only devices already provided by the ZHA integration can be used. Choose the rotary knob that emits rotate_type events."
+          "device_id": "Only devices already provided by the ZHA integration can be used. Choose the rotary knob that emits rotate_type events.",
+          "dashboard_path": "Use the first dashboard URL segment, for example lovelace or dashboard-home. Full dashboard URLs are also accepted.",
+          "navigation_enabled": "Turn knob navigation on or off globally.",
+          "overlay_enabled": "Show the tab overlay before moving tabs.",
+          "overlay_timeout_ms": "Overlay visibility in milliseconds.",
+          "cooldown_ms": "Ignore repeated rotations for this many milliseconds.",
+          "wrap_enabled": "Move from the last tab to the first tab, and from the first tab to the last tab.",
+          "require_query_param": "Optional. If set, only browser URLs containing this query parameter react."
         }
       }
     },
@@ -34,6 +62,66 @@
     "abort": {
       "already_configured": "Knob Swipe Navigation is already configured.",
       "reconfigure_successful": "Knob Swipe Navigation was reconfigured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Knob Swipe Navigation options",
+        "description": "Configure the dashboard and runtime behavior for knob navigation.",
+        "data": {
+          "dashboard_path": "Dashboard path",
+          "navigation_enabled": "Navigation enabled",
+          "overlay_enabled": "Overlay enabled",
+          "overlay_timeout_ms": "Overlay timeout",
+          "cooldown_ms": "Cooldown",
+          "wrap_enabled": "Wrap tabs",
+          "require_query_param": "Required URL query parameter"
+        },
+        "data_description": {
+          "dashboard_path": "Use the first dashboard URL segment, for example lovelace or dashboard-home. Full dashboard URLs are also accepted.",
+          "navigation_enabled": "Turn knob navigation on or off globally.",
+          "overlay_enabled": "Show the tab overlay before moving tabs.",
+          "overlay_timeout_ms": "Overlay visibility in milliseconds.",
+          "cooldown_ms": "Ignore repeated rotations for this many milliseconds.",
+          "wrap_enabled": "Move from the last tab to the first tab, and from the first tab to the last tab.",
+          "require_query_param": "Optional. If set, only browser URLs containing this query parameter react."
+        }
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "navigation_enabled": {
+        "name": "Navigation enabled"
+      },
+      "overlay_enabled": {
+        "name": "Overlay enabled"
+      },
+      "wrap_enabled": {
+        "name": "Wrap tabs"
+      }
+    },
+    "number": {
+      "overlay_timeout_ms": {
+        "name": "Overlay timeout"
+      },
+      "cooldown_ms": {
+        "name": "Cooldown"
+      }
+    },
+    "event": {
+      "rotation": {
+        "name": "Rotation"
+      }
+    },
+    "sensor": {
+      "last_rotation": {
+        "name": "Last rotation"
+      },
+      "last_navigation_result": {
+        "name": "Last navigation result"
+      }
     }
   },
   "exceptions": {

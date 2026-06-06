@@ -18,14 +18,14 @@ rules:
   docs-installation-instructions: done
   docs-removal-instructions: done
   entity-event-setup:
-    status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    status: done
+    comment: Event listeners are registered during config entry setup and removed on unload.
   entity-unique-id:
-    status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    status: done
+    comment: All entities expose stable unique IDs scoped to the config entry.
   has-entity-name:
-    status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    status: done
+    comment: All entities set has_entity_name and use translation keys.
   runtime-data: done
   test-before-configure: done
   test-before-setup: done
@@ -39,15 +39,15 @@ rules:
   docs-configuration-parameters: done
   docs-installation-parameters: done
   entity-unavailable:
-    status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    status: done
+    comment: Entities are local config/diagnostic entities and remain available while the config entry is loaded.
   integration-owner: done
   log-when-unavailable:
     status: exempt
     comment: Integration has no device connection loop or entity availability state.
   parallel-updates:
     status: exempt
-    comment: Integration does not expose entity platforms.
+    comment: Entities are local push/config entities and do not poll.
   reauthentication-flow:
     status: exempt
     comment: Integration does not authenticate with a device or service.
@@ -73,21 +73,21 @@ rules:
     status: exempt
     comment: Integration creates one static service device and has no child devices.
   entity-category:
-    status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    status: done
+    comment: Configuration and diagnostic entities use appropriate entity categories.
   entity-device-class:
     status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    comment: Exposed entities do not represent measurements with applicable device classes.
   entity-disabled-by-default:
-    status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    status: done
+    comment: Diagnostic entities are intentionally enabled by default because they are the primary troubleshooting surface for this integration.
   entity-translations:
-    status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    status: done
+    comment: Entity names are defined in strings and translations.
   exception-translations: done
   icon-translations:
     status: exempt
-    comment: Integration does not expose Home Assistant entities.
+    comment: Entities use domain defaults; no custom icons are required.
   reconfiguration-flow: done
   repair-issues: done
   stale-devices:

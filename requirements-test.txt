@@ -1,5 +1,6 @@
 coverage[toml]
 homeassistant>=2026.3.0
+home-assistant-frontend
 pytest
 pytest-asyncio
 pytest-homeassistant-custom-component

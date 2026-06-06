@@ -16,10 +16,25 @@ from custom_components.knob_swipe_navigation import (
     async_migrate_entry,
     async_setup_entry,
     async_unload_entry,
+    websocket_config,
+    websocket_navigation_result,
 )
 from custom_components.knob_swipe_navigation.const import (
+    CONF_DASHBOARD_PATH,
+    CONF_NAVIGATION_ENABLED,
+    CONF_OVERLAY_TIMEOUT_MS,
+    DEFAULT_DASHBOARD_PATH,
     DOMAIN,
+    ENTITY_NAVIGATION_ENABLED,
+    EVENT_ZHA,
     REPAIR_ISSUE_DEVICE_NOT_ZHA,
+    ROTATION_NEXT,
+    WS_TYPE_CONFIG,
+    WS_TYPE_NAVIGATION_RESULT,
+)
+from custom_components.knob_swipe_navigation.models import (
+    KnobSwipeNavigationRuntimeData,
+    KnobSwipeNavigationSettings,
 )
 
 
@@ -50,12 +65,21 @@ async def test_setup_entry_registers_runtime_data_and_service_device(
     hass.http = Mock()
     hass.http.async_register_static_paths = AsyncMock()
 
-    with patch(
-        "custom_components.knob_swipe_navigation.frontend.add_extra_js_url"
-    ) as add_extra_js_url:
+    with (
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            AsyncMock(return_value=True),
+        ) as forward_entry_setups,
+        patch(
+            "custom_components.knob_swipe_navigation.frontend.add_extra_js_url"
+        ) as add_extra_js_url,
+    ):
         assert await async_setup_entry(hass, entry)
 
     assert entry.runtime_data.device_id == device.id
+    assert entry.runtime_data.settings.dashboard_path == DEFAULT_DASHBOARD_PATH
+    forward_entry_setups.assert_awaited_once()
     add_extra_js_url.assert_called_once()
 
     service_device = dr.async_get(hass).async_get_device(
@@ -63,6 +87,45 @@ async def test_setup_entry_registers_runtime_data_and_service_device(
     )
     assert service_device is not None
     assert service_device.entry_type is dr.DeviceEntryType.SERVICE
+
+
+async def test_setup_entry_tracks_selected_knob_rotation(
+    hass: HomeAssistant,
+) -> None:
+    """Test setup registers a backend ZHA event listener."""
+    device = _create_device(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=DOMAIN,
+        data={CONF_DEVICE_ID: device.id},
+    )
+    entry.add_to_hass(hass)
+    hass.http = Mock()
+    hass.http.async_register_static_paths = AsyncMock()
+
+    with (
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            AsyncMock(return_value=True),
+        ),
+        patch("custom_components.knob_swipe_navigation.frontend.add_extra_js_url"),
+    ):
+        assert await async_setup_entry(hass, entry)
+
+    hass.bus.async_fire(
+        EVENT_ZHA,
+        {
+            "device_id": device.id,
+            "command": "rotate_type",
+            "params": {"rotate_type": 0},
+            "args": [0],
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert entry.runtime_data.last_rotation == ROTATION_NEXT
+    assert entry.runtime_data.last_rotation_value == 0
 
 
 async def test_setup_entry_raises_and_creates_repair_issue_for_invalid_device(
@@ -87,12 +150,21 @@ async def test_setup_entry_raises_and_creates_repair_issue_for_invalid_device(
 async def test_unload_entry_removes_frontend_resource(hass: HomeAssistant) -> None:
     """Test unload removes the frontend module."""
     entry = MockConfigEntry(domain=DOMAIN, unique_id=DOMAIN)
+    entry.add_to_hass(hass)
 
-    with patch(
-        "custom_components.knob_swipe_navigation.frontend.remove_extra_js_url"
-    ) as remove_extra_js_url:
+    with (
+        patch.object(
+            hass.config_entries,
+            "async_unload_platforms",
+            AsyncMock(return_value=True),
+        ) as unload_platforms,
+        patch(
+            "custom_components.knob_swipe_navigation.frontend.remove_extra_js_url"
+        ) as remove_extra_js_url,
+    ):
         assert await async_unload_entry(hass, entry)
 
+    unload_platforms.assert_awaited_once()
     remove_extra_js_url.assert_called_once()
 
 
@@ -112,5 +184,79 @@ async def test_migrate_entry_moves_options_device_to_data(
 
     assert await async_migrate_entry(hass, entry)
     assert entry.data == {CONF_DEVICE_ID: device.id}
-    assert entry.options == {}
-    assert entry.minor_version == 2
+    assert entry.options[CONF_DASHBOARD_PATH] == DEFAULT_DASHBOARD_PATH
+    assert entry.options[CONF_NAVIGATION_ENABLED] is True
+    assert entry.minor_version == 3
+
+
+def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
+    """Test the frontend config websocket command returns settings and entity IDs."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=DOMAIN,
+        data={CONF_DEVICE_ID: "device-id"},
+        options={
+            CONF_DASHBOARD_PATH: "dashboard-home",
+            CONF_OVERLAY_TIMEOUT_MS: 1800,
+        },
+    )
+    entry.runtime_data = KnobSwipeNavigationRuntimeData(
+        device_id="device-id",
+        settings=KnobSwipeNavigationSettings(
+            dashboard_path="dashboard-home",
+            overlay_timeout_ms=1800,
+        ),
+    )
+    entry.runtime_data.entity_ids[ENTITY_NAVIGATION_ENABLED] = (
+        "switch.knob_navigation_enabled"
+    )
+    entry.add_to_hass(hass)
+    connection = Mock()
+
+    websocket_config(hass, connection, {"id": 1, "type": WS_TYPE_CONFIG})
+
+    result = connection.send_result.call_args.args[1]
+    assert result["device_id"] == "device-id"
+    assert result["dashboard_path"] == "dashboard-home"
+    assert result["overlay_timeout_ms"] == 1800
+    assert result["entities"][ENTITY_NAVIGATION_ENABLED] == (
+        "switch.knob_navigation_enabled"
+    )
+
+
+def test_websocket_navigation_result_updates_runtime_data(
+    hass: HomeAssistant,
+) -> None:
+    """Test frontend navigation results update runtime diagnostics."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=DOMAIN,
+        data={CONF_DEVICE_ID: "device-id"},
+    )
+    entry.runtime_data = KnobSwipeNavigationRuntimeData(
+        device_id="device-id",
+        settings=KnobSwipeNavigationSettings(),
+    )
+    entry.add_to_hass(hass)
+    connection = Mock()
+
+    websocket_navigation_result(
+        hass,
+        connection,
+        {
+            "id": 1,
+            "type": WS_TYPE_NAVIGATION_RESULT,
+            "result": "navigated",
+            "dashboard_path": "lovelace",
+            "from_view": "home",
+            "to_view": "lights",
+        },
+    )
+
+    assert entry.runtime_data.last_navigation_result == "navigated"
+    assert entry.runtime_data.last_navigation_details == {
+        "dashboard_path": "lovelace",
+        "from_view": "home",
+        "to_view": "lights",
+    }
+    connection.send_result.assert_called_once()

@@ -8,6 +8,10 @@ from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.knob_swipe_navigation.const import DOMAIN
+from custom_components.knob_swipe_navigation.models import (
+    KnobSwipeNavigationRuntimeData,
+    KnobSwipeNavigationSettings,
+)
 from custom_components.knob_swipe_navigation.diagnostics import (
     async_get_config_entry_diagnostics,
 )
@@ -36,6 +40,11 @@ async def test_diagnostics_redacts_configured_device_id(
         unique_id=DOMAIN,
         data={CONF_DEVICE_ID: device.id},
     )
+    entry.runtime_data = KnobSwipeNavigationRuntimeData(
+        device_id=device.id,
+        settings=KnobSwipeNavigationSettings(dashboard_path="dashboard-home"),
+    )
+    entry.runtime_data.entity_ids["navigation_enabled"] = "switch.navigation_enabled"
     entry.add_to_hass(hass)
 
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
@@ -45,3 +54,7 @@ async def test_diagnostics_redacts_configured_device_id(
     assert diagnostics["selected_device"]["manufacturer"] == "Example"
     assert diagnostics["selected_device"]["model"] == "Rotary knob"
     assert diagnostics["selected_device"]["config_entry_domains"] == ["zha"]
+    assert diagnostics["settings"]["dashboard_path"] == "dashboard-home"
+    assert diagnostics["entities"] == {
+        "navigation_enabled": "switch.navigation_enabled"
+    }

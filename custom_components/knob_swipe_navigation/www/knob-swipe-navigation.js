@@ -1,7 +1,9 @@
-const KNOB_SWIPE_NAV_VERSION = "0.1.1";
+const KNOB_SWIPE_NAV_VERSION = "0.2.0";
 const WS_CONFIG_TYPE = "knob_swipe_navigation/config";
+const WS_NAVIGATION_RESULT_TYPE = "knob_swipe_navigation/navigation_result";
 const OVERLAY_ID = "knob-swipe-navigation-overlay";
 const STYLE_ID = "knob-swipe-navigation-style";
+const DEFAULT_DASHBOARD_PATH = "lovelace";
 const DEFAULT_OVERLAY_TIMEOUT = 2800;
 const SWIPE_ANIMATION_MS = 220;
 const SWIPE_DELAY_MS = 32;
@@ -82,6 +84,16 @@ async function callWS(hass, message) {
   throw new Error("Home Assistant WebSocket connection is unavailable.");
 }
 
+function reportNavigationResult(result, details = {}) {
+  const hass = getHass();
+  if (!hass || !state.configLoaded) return;
+  callWS(hass, {
+    type: WS_NAVIGATION_RESULT_TYPE,
+    result,
+    ...details,
+  }).catch(() => {});
+}
+
 async function loadBackendConfig(hass) {
   try {
     state.config = await callWS(hass, { type: WS_CONFIG_TYPE });
@@ -124,30 +136,70 @@ function normalizeNumber(value, defaultValue, min, max) {
   return Math.max(min, Math.min(max, parsed));
 }
 
-function dashboardKnobConfig() {
-  const config = lovelaceConfig();
-  const swipeNav = config?.swipe_nav || {};
-  const knob = swipeNav.knob || config?.knob_swipe_navigation || null;
-  if (!knob || knob.enable !== true) return null;
+function normalizeDashboardPath(value) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return DEFAULT_DASHBOARD_PATH;
+  try {
+    const url = new URL(raw, location.origin);
+    const parts = url.pathname.split("/").filter(Boolean);
+    return parts[0] || DEFAULT_DASHBOARD_PATH;
+  } catch (_err) {
+    const parts = raw.split(/[?#]/, 1)[0].split("/").filter(Boolean);
+    return parts[0] || DEFAULT_DASHBOARD_PATH;
+  }
+}
 
+function entityValue(hass, entityId) {
+  if (!entityId) return undefined;
+  return hass?.states?.[entityId]?.state;
+}
+
+function entityBool(hass, entityId, defaultValue) {
+  const value = entityValue(hass, entityId);
+  if (value === "on") return true;
+  if (value === "off") return false;
+  return normalizeBool(defaultValue, defaultValue);
+}
+
+function entityNumber(hass, entityId, defaultValue, min, max) {
+  const value = entityValue(hass, entityId);
+  return normalizeNumber(value ?? defaultValue, defaultValue, min, max);
+}
+
+function navigationSettings() {
+  if (!state.configLoaded || !state.config) return null;
+  const hass = getHass();
+  const entities = state.config.entities || {};
   return {
-    wrap: normalizeBool(swipeNav.wrap, true),
-    overlay: normalizeBool(knob.overlay, true),
-    overlayTimeout: normalizeNumber(
-      knob.overlay_timeout,
-      DEFAULT_OVERLAY_TIMEOUT,
+    dashboardPath: normalizeDashboardPath(state.config.dashboard_path),
+    navigationEnabled: entityBool(
+      hass,
+      entities.navigation_enabled,
+      state.config.navigation_enabled ?? true,
+    ),
+    wrap: entityBool(hass, entities.wrap_enabled, state.config.wrap_enabled ?? true),
+    overlay: entityBool(
+      hass,
+      entities.overlay_enabled,
+      state.config.overlay_enabled ?? true,
+    ),
+    overlayTimeout: entityNumber(
+      hass,
+      entities.overlay_timeout_ms,
+      state.config.overlay_timeout_ms ?? DEFAULT_OVERLAY_TIMEOUT,
       500,
       10000,
     ),
-    cooldownMs: normalizeNumber(knob.cooldown_ms, 0, 0, 10000),
-    requireFully: normalizeBool(knob.require_fully, false),
+    cooldownMs: entityNumber(
+      hass,
+      entities.cooldown_ms,
+      state.config.cooldown_ms ?? 0,
+      0,
+      10000,
+    ),
     requireQueryParam:
-      typeof knob.require_query_param === "string"
-        ? knob.require_query_param.trim()
-        : "",
-    suppressIfEntityOn:
-      typeof knob.suppress_if_entity_on === "string"
-        ? knob.suppress_if_entity_on.trim()
+      typeof state.config.require_query_param === "string"
+        ? state.config.require_query_param.trim()
         : "",
   };
 }
@@ -551,40 +603,75 @@ function rotateValue(eventData) {
 }
 
 function handleRotate(direction) {
-  const settings = dashboardKnobConfig();
+  const settings = navigationSettings();
   if (!settings) return;
-  if (settings.requireFully && !window.fully) return;
+  const currentDashboardPath = dashboardPath();
+  if (!settings.navigationEnabled) {
+    reportNavigationResult("ignored_disabled", {
+      dashboard_path: currentDashboardPath,
+      direction,
+    });
+    return;
+  }
+  if (currentDashboardPath !== settings.dashboardPath) return;
   if (
     settings.requireQueryParam &&
     !new URLSearchParams(location.search).has(settings.requireQueryParam)
   ) {
-    return;
-  }
-  const hass = getHass();
-  if (
-    settings.suppressIfEntityOn &&
-    hass?.states?.[settings.suppressIfEntityOn]?.state === "on"
-  ) {
+    reportNavigationResult("ignored_query", {
+      dashboard_path: currentDashboardPath,
+      direction,
+      reason: settings.requireQueryParam,
+    });
     return;
   }
 
   const now = Date.now();
   if (settings.cooldownMs > 0 && now - state.lastEventAt < settings.cooldownMs) {
+    reportNavigationResult("ignored_cooldown", {
+      dashboard_path: currentDashboardPath,
+      direction,
+    });
     return;
   }
   state.lastEventAt = now;
 
   const tabs = dashboardTabs();
-  if (tabs.length < 2) return;
+  if (tabs.length < 2) {
+    reportNavigationResult("ignored_no_tabs", {
+      dashboard_path: currentDashboardPath,
+      direction,
+    });
+    return;
+  }
 
   const current = currentIndex(tabs);
-  if (current < 0) return;
+  if (current < 0) {
+    reportNavigationResult("ignored_unknown_tab", {
+      dashboard_path: currentDashboardPath,
+      direction,
+    });
+    return;
+  }
 
   const goNext = direction === "next";
   const next = targetIndex(current, tabs, goNext, settings);
-  if (next < 0) return;
+  if (next < 0) {
+    reportNavigationResult("ignored_edge", {
+      dashboard_path: currentDashboardPath,
+      direction,
+      from_view: tabs[current]?.view,
+    });
+    return;
+  }
 
   const target = tabs[next].path;
+  reportNavigationResult("navigated", {
+    dashboard_path: currentDashboardPath,
+    direction,
+    from_view: tabs[current]?.view,
+    to_view: tabs[next]?.view,
+  });
   if (settings.overlay) {
     renderOverlay(tabs, next, settings.overlayTimeout);
   }
@@ -632,7 +719,7 @@ window.knobSwipeNavigation = {
     if (hass) await loadBackendConfig(hass);
   },
   showOverlay: () => {
-    const settings = dashboardKnobConfig() || {
+    const settings = navigationSettings() || {
       overlay: true,
       overlayTimeout: DEFAULT_OVERLAY_TIMEOUT,
     };
