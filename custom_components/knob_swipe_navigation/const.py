@@ -6,7 +6,7 @@ DOMAIN = "knob_swipe_navigation"
 
 FRONTEND_URL_PATH = "/knob_swipe_navigation"
 FRONTEND_MODULE = "knob-swipe-navigation.js"
-FRONTEND_MODULE_URL = f"{FRONTEND_URL_PATH}/{FRONTEND_MODULE}?v=0.2.2"
+FRONTEND_MODULE_URL = f"{FRONTEND_URL_PATH}/{FRONTEND_MODULE}?v=0.3.0"
 
 WS_TYPE_CONFIG = f"{DOMAIN}/config"
 WS_TYPE_SUBSCRIBE_ROTATIONS = f"{DOMAIN}/subscribe_rotations"
@@ -17,7 +17,11 @@ COMMAND_ROTATE_TYPE = "rotate_type"
 ROTATION_NEXT = "next"
 ROTATION_PREVIOUS = "previous"
 
+CAPABILITY_PROFILE_ZHA_ROTATE_TYPE = "zha_rotate_type"
+DEFAULT_CAPABILITY_PROFILE = CAPABILITY_PROFILE_ZHA_ROTATE_TYPE
+
 CONF_DASHBOARD_PATH = "dashboard_path"
+CONF_CAPABILITY_PROFILE = "capability_profile"
 CONF_NAVIGATION_ENABLED = "navigation_enabled"
 CONF_OVERLAY_ENABLED = "overlay_enabled"
 CONF_OVERLAY_TIMEOUT_MS = "overlay_timeout_ms"

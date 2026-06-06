@@ -1,4 +1,4 @@
-const KNOB_SWIPE_NAV_VERSION = "0.2.2";
+const KNOB_SWIPE_NAV_VERSION = "0.3.0";
 const WS_CONFIG_TYPE = "knob_swipe_navigation/config";
 const WS_SUBSCRIBE_ROTATIONS_TYPE = "knob_swipe_navigation/subscribe_rotations";
 const WS_NAVIGATION_RESULT_TYPE = "knob_swipe_navigation/navigation_result";
@@ -27,7 +27,8 @@ const appLegacySelectors = viewSelectors.concat("$", "div");
 const state = {
   config: null,
   configLoaded: false,
-  lastEventAt: 0,
+  entries: [],
+  entryStates: new Map(),
   unsubscribe: null,
 };
 
@@ -86,11 +87,21 @@ async function callWS(hass, message) {
   throw new Error("Home Assistant WebSocket connection is unavailable.");
 }
 
-function reportNavigationResult(result, details = {}) {
+function entryRuntime(entry) {
+  const key = entry?.entry_id || entry?.device_id || "default";
+  if (!state.entryStates.has(key)) {
+    state.entryStates.set(key, { lastEventAt: 0 });
+  }
+  return state.entryStates.get(key);
+}
+
+function reportNavigationResult(entry, result, details = {}) {
   const hass = getHass();
   if (!hass || !state.configLoaded) return;
   callWS(hass, {
-    type: WS_NAVIGATION_RESULT_TYPE,
+    type: state.config?.navigation_result_type || WS_NAVIGATION_RESULT_TYPE,
+    entry_id: entry?.entry_id,
+    device_id: entry?.device_id,
     result,
     ...details,
   }).catch(() => {});
@@ -99,9 +110,11 @@ function reportNavigationResult(result, details = {}) {
 async function loadBackendConfig(hass) {
   try {
     state.config = await callWS(hass, { type: WS_CONFIG_TYPE });
+    state.entries = Array.isArray(state.config.entries) ? state.config.entries : [];
     state.configLoaded = true;
   } catch (err) {
     state.config = null;
+    state.entries = [];
     state.configLoaded = false;
   }
 }
@@ -168,40 +181,40 @@ function entityNumber(hass, entityId, defaultValue, min, max) {
   return normalizeNumber(value ?? defaultValue, defaultValue, min, max);
 }
 
-function navigationSettings() {
-  if (!state.configLoaded || !state.config) return null;
+function navigationSettings(entry) {
+  if (!state.configLoaded || !entry) return null;
   const hass = getHass();
-  const entities = state.config.entities || {};
+  const entities = entry.entities || {};
   return {
-    dashboardPath: normalizeDashboardPath(state.config.dashboard_path),
+    dashboardPath: normalizeDashboardPath(entry.dashboard_path),
     navigationEnabled: entityBool(
       hass,
       entities.navigation_enabled,
-      state.config.navigation_enabled ?? true,
+      entry.navigation_enabled ?? true,
     ),
-    wrap: entityBool(hass, entities.wrap_enabled, state.config.wrap_enabled ?? true),
+    wrap: entityBool(hass, entities.wrap_enabled, entry.wrap_enabled ?? true),
     overlay: entityBool(
       hass,
       entities.overlay_enabled,
-      state.config.overlay_enabled ?? true,
+      entry.overlay_enabled ?? true,
     ),
     overlayTimeout: entityNumber(
       hass,
       entities.overlay_timeout_ms,
-      state.config.overlay_timeout_ms ?? DEFAULT_OVERLAY_TIMEOUT,
+      entry.overlay_timeout_ms ?? DEFAULT_OVERLAY_TIMEOUT,
       500,
       10000,
     ),
     cooldownMs: entityNumber(
       hass,
       entities.cooldown_ms,
-      state.config.cooldown_ms ?? 2000,
+      entry.cooldown_ms ?? 2000,
       0,
       10000,
     ),
     requireQueryParam:
-      typeof state.config.require_query_param === "string"
-        ? state.config.require_query_param.trim()
+      typeof entry.require_query_param === "string"
+        ? entry.require_query_param.trim()
         : "",
   };
 }
@@ -594,22 +607,40 @@ function verify(target, expectedIndex, tabs, settings, delay, goNext) {
   }, delay);
 }
 
-function rotateValue(eventData) {
+function entryById(entryId) {
+  if (!entryId) return null;
+  return state.entries.find((entry) => entry.entry_id === entryId) || null;
+}
+
+function entryByDeviceId(deviceId) {
+  if (!deviceId) return null;
+  return state.entries.find((entry) => entry.device_id === deviceId) || null;
+}
+
+function rotateValue(entry, eventData) {
+  const profile = entry?.capability_profile || {};
+  const valueParameter = profile.value_parameter || "rotate_type";
+  const argsIndex = Number.isInteger(profile.args_index) ? profile.args_index : 0;
   const params = eventData?.params || {};
-  if (Object.prototype.hasOwnProperty.call(params, "rotate_type")) {
-    return Number(params.rotate_type);
+  if (Object.prototype.hasOwnProperty.call(params, valueParameter)) {
+    return Number(params[valueParameter]);
   }
   const args = Array.isArray(eventData?.args) ? eventData.args : [];
-  if (args.length) return Number(args[0]);
+  if (args.length > argsIndex) return Number(args[argsIndex]);
   return Number.NaN;
 }
 
-function handleRotate(direction) {
-  const settings = navigationSettings();
+function directionForValue(entry, value) {
+  const rotate = entry?.capability_profile?.rotate || {};
+  return rotate[String(value)];
+}
+
+function handleRotate(entry, direction) {
+  const settings = navigationSettings(entry);
   if (!settings) return;
   const currentDashboardPath = dashboardPath();
   if (!settings.navigationEnabled) {
-    reportNavigationResult("ignored_disabled", {
+    reportNavigationResult(entry, "ignored_disabled", {
       dashboard_path: currentDashboardPath,
       direction,
     });
@@ -620,7 +651,7 @@ function handleRotate(direction) {
     settings.requireQueryParam &&
     !new URLSearchParams(location.search).has(settings.requireQueryParam)
   ) {
-    reportNavigationResult("ignored_query", {
+    reportNavigationResult(entry, "ignored_query", {
       dashboard_path: currentDashboardPath,
       direction,
       reason: settings.requireQueryParam,
@@ -629,18 +660,19 @@ function handleRotate(direction) {
   }
 
   const now = Date.now();
-  if (settings.cooldownMs > 0 && now - state.lastEventAt < settings.cooldownMs) {
-    reportNavigationResult("ignored_cooldown", {
+  const runtime = entryRuntime(entry);
+  if (settings.cooldownMs > 0 && now - runtime.lastEventAt < settings.cooldownMs) {
+    reportNavigationResult(entry, "ignored_cooldown", {
       dashboard_path: currentDashboardPath,
       direction,
     });
     return;
   }
-  state.lastEventAt = now;
+  runtime.lastEventAt = now;
 
   const tabs = dashboardTabs();
   if (tabs.length < 2) {
-    reportNavigationResult("ignored_no_tabs", {
+    reportNavigationResult(entry, "ignored_no_tabs", {
       dashboard_path: currentDashboardPath,
       direction,
     });
@@ -649,7 +681,7 @@ function handleRotate(direction) {
 
   const current = currentIndex(tabs);
   if (current < 0) {
-    reportNavigationResult("ignored_unknown_tab", {
+    reportNavigationResult(entry, "ignored_unknown_tab", {
       dashboard_path: currentDashboardPath,
       direction,
     });
@@ -659,7 +691,7 @@ function handleRotate(direction) {
   const goNext = direction === "next";
   const next = targetIndex(current, tabs, goNext, settings);
   if (next < 0) {
-    reportNavigationResult("ignored_edge", {
+    reportNavigationResult(entry, "ignored_edge", {
       dashboard_path: currentDashboardPath,
       direction,
       from_view: tabs[current]?.view,
@@ -668,7 +700,7 @@ function handleRotate(direction) {
   }
 
   const target = tabs[next].path;
-  reportNavigationResult("navigated", {
+  reportNavigationResult(entry, "navigated", {
     dashboard_path: currentDashboardPath,
     direction,
     from_view: tabs[current]?.view,
@@ -690,27 +722,36 @@ function handleRotate(direction) {
 }
 
 function handleZhaEvent(event) {
-  if (!state.configLoaded || !state.config) return;
+  if (!state.configLoaded) return;
   const data = event?.data || {};
-  if (data.device_id !== state.config.device_id) return;
-  if (data.command !== "rotate_type") return;
+  const entry = entryByDeviceId(data.device_id);
+  if (!entry) return;
+  const profile = entry.capability_profile || {};
+  if (data.command !== profile.command) return;
 
-  const value = rotateValue(data);
-  const direction = state.config.rotate?.[String(value)];
+  const value = rotateValue(entry, data);
+  const direction = directionForValue(entry, value);
   if (direction !== "next" && direction !== "previous") return;
-  handleRotate(direction);
+  handleRotate(entry, direction);
 }
 
 function handleBackendRotation(event) {
   const payload = event?.event || event || {};
+  const entry = entryById(payload.entry_id) || entryByDeviceId(payload.device_id);
+  if (!entry) return;
   const direction = payload.direction;
   if (direction !== "next" && direction !== "previous") return;
-  handleRotate(direction);
+  handleRotate(entry, direction);
 }
 
 async function subscribeRotations(hass) {
   const connection = getConnection(hass);
   if (!connection) return;
+  if (typeof state.unsubscribe === "function") {
+    state.unsubscribe();
+    state.unsubscribe = null;
+  }
+  if (!state.entries.length) return;
 
   const subscriptionType =
     state.config?.rotation_subscription_type || WS_SUBSCRIBE_ROTATIONS_TYPE;
@@ -726,7 +767,20 @@ async function subscribeRotations(hass) {
   }
 
   if (typeof connection.subscribeEvents === "function") {
-    state.unsubscribe = await connection.subscribeEvents(handleZhaEvent, "zha_event");
+    const eventTypes = [
+      ...new Set(
+        state.entries
+          .map((entry) => entry.capability_profile?.event_type)
+          .filter(Boolean),
+      ),
+    ];
+    const unsubscribers = [];
+    for (const eventType of eventTypes) {
+      unsubscribers.push(await connection.subscribeEvents(handleZhaEvent, eventType));
+    }
+    state.unsubscribe = () => {
+      for (const unsubscribe of unsubscribers) unsubscribe();
+    };
   }
 }
 
@@ -745,10 +799,13 @@ window.knobSwipeNavigation = {
   version: KNOB_SWIPE_NAV_VERSION,
   reloadConfig: async () => {
     const hass = getHass();
-    if (hass) await loadBackendConfig(hass);
+    if (hass) {
+      await loadBackendConfig(hass);
+      await subscribeRotations(hass);
+    }
   },
   showOverlay: () => {
-    const settings = navigationSettings() || {
+    const settings = navigationSettings(state.entries[0]) || {
       overlay: true,
       overlayTimeout: DEFAULT_OVERLAY_TIMEOUT,
     };

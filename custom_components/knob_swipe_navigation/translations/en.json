@@ -9,7 +9,7 @@
     "step": {
       "user": {
         "title": "Knob Swipe Navigation",
-        "description": "Choose the ZHA rotary knob device and the dashboard it should control.",
+        "description": "Choose one ZHA rotary knob device and the dashboard it should control. Add the integration again for each additional knob.",
         "data": {
           "ZHA knob device": "ZHA knob device",
           "Dashboard path": "Dashboard path",
@@ -57,10 +57,11 @@
       }
     },
     "error": {
-      "not_zha_device": "Select a device provided by ZHA."
+      "not_zha_device": "Select a device provided by ZHA.",
+      "already_configured": "This knob is already configured."
     },
     "abort": {
-      "already_configured": "Knob Swipe Navigation is already configured.",
+      "already_configured": "This knob is already configured.",
       "reconfigure_successful": "Knob Swipe Navigation was reconfigured."
     }
   },

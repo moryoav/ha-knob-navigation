@@ -17,6 +17,7 @@ from .const import (
     DEFAULT_REQUIRE_QUERY_PARAM,
     DEFAULT_WRAP_ENABLED,
 )
+from .profiles import RotationCapabilityProfile, ZHA_ROTATE_TYPE_PROFILE
 
 
 @dataclass(slots=True)
@@ -37,7 +38,9 @@ class RotationEventData:
     """Rotation event data from the selected knob."""
 
     direction: str
-    rotate_type: int
+    value: int
+    value_attribute: str
+    capability_profile: str
     event_data: dict[str, Any]
 
 
@@ -55,11 +58,14 @@ class KnobSwipeNavigationRuntimeData:
 
     device_id: str
     settings: KnobSwipeNavigationSettings
+    capability_profile: RotationCapabilityProfile = ZHA_ROTATE_TYPE_PROFILE
     service_device_id: str | None = None
     entity_ids: dict[str, str] = field(default_factory=dict)
     last_rotation: str | None = None
     last_rotation_at: datetime | None = None
     last_rotation_value: int | None = None
+    last_rotation_value_attribute: str | None = None
+    last_rotation_capability_profile: str | None = None
     last_navigation_result: str | None = None
     last_navigation_result_at: datetime | None = None
     last_navigation_details: dict[str, Any] | None = None

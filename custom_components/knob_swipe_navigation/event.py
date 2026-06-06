@@ -45,5 +45,11 @@ class KnobSwipeNavigationRotationEvent(KnobSwipeNavigationEntity, EventEntity):
     @callback
     def _handle_rotation(self, data: RotationEventData) -> None:
         """Handle a rotation event."""
-        self._trigger_event(data.direction, {"rotate_type": data.rotate_type})
+        self._trigger_event(
+            data.direction,
+            {
+                data.value_attribute: data.value,
+                "capability_profile": data.capability_profile,
+            },
+        )
         self.async_write_ha_state()

@@ -1,13 +1,17 @@
 # Knob Swipe Navigation
 [![HACS][hacs-badge]][hacs-url] [![release][release-badge]][release-url] ![downloads][downloads-badge] [![hassfest][hassfest-badge]][hassfest-url] [![validate][validate-badge]][validate-url] [![license][license-badge]][license-url]
 
-Knob Swipe Navigation is a Home Assistant custom integration that lets one configured ZHA rotary knob change tabs on one configured Lovelace dashboard. The selected dashboard and navigation behavior are configured from **Settings -> Devices & services**; no dashboard YAML block or template helper is required.
+Knob Swipe Navigation is a Home Assistant custom integration that lets configured ZHA rotary knobs change tabs on configured Lovelace dashboards. Each config entry maps one knob to one dashboard path with its own navigation behavior, entities, cooldown, browser targeting, and diagnostics. Setup is handled from **Settings -> Devices & services**; no dashboard YAML block or template helper is required.
 
-This version supports ZHA rotation only:
+This version ships with the `zha_rotate_type` capability profile:
 
 - `rotate_type: 0` moves to the next tab.
 - `rotate_type: 1` moves to the previous tab.
 - Press events are ignored.
+
+## Upgrade Note
+
+Version `0.3.0` changes config entries from a singleton integration entry to one entry per physical knob. Remove the old Knob Swipe Navigation entry after upgrading, then add the integration again for each knob you want to use.
 
 ## Requirements
 
@@ -47,14 +51,15 @@ Unsupported devices and modes:
 The integration provides:
 
 - UI setup from **Settings -> Devices & services**.
-- UI reconfiguration for the selected knob and dashboard path.
-- One Home Assistant service device for the navigation bridge.
-- A frontend module that subscribes to ZHA events and navigates the configured dashboard.
-- Config entities for enablement, overlay, wrap, overlay timeout, and cooldown.
-- Diagnostic event/sensor entities for knob rotation and frontend navigation results.
-- Diagnostics download with redacted config entry data, settings, entity IDs, and selected-device metadata.
-- A repair issue if the configured knob is no longer provided by ZHA.
-- Optional browser targeting with a required URL query parameter.
+- Multiple config entries, one per ZHA rotary knob.
+- UI reconfiguration for each selected knob and dashboard path.
+- One Home Assistant service device per configured knob.
+- A frontend module that subscribes to integration-owned rotation events for all configured knobs.
+- Per-knob config entities for enablement, overlay, wrap, overlay timeout, and cooldown.
+- Per-knob diagnostic event/sensor entities for rotation and frontend navigation results.
+- Diagnostics download with redacted config entry data, capability profile, settings, entity IDs, and selected-device metadata.
+- A per-entry repair issue if a configured knob is no longer provided by ZHA.
+- Optional browser targeting with a required URL query parameter per knob.
 
 The integration does not create service actions, device triggers, or long-term statistics.
 
@@ -82,6 +87,7 @@ After restart, add the integration in Home Assistant:
 4. Enter the dashboard path to control, for example `lovelace` or `dashboard-home`.
 5. Choose overlay, cooldown, wrap, and optional URL query targeting settings.
 6. Finish setup.
+7. Repeat **Add integration** for each additional knob.
 
 ## Manual Installation
 
@@ -118,7 +124,7 @@ Restart Home Assistant, then add the integration from **Settings -> Devices & se
 
 ## Configuration
 
-The selected dashboard is configured by path. Use the first URL segment of the dashboard:
+Each entry has one selected knob and one selected dashboard path. Use the first URL segment of the dashboard:
 
 - `/lovelace/home` -> `lovelace`
 - `/dashboard-home/default_view?kiosk` -> `dashboard-home`
@@ -126,7 +132,7 @@ The selected dashboard is configured by path. Use the first URL segment of the d
 
 All normal, visible tabs in that dashboard are affected. Subviews and hidden views are skipped.
 
-Settings available from setup, reconfigure, and options:
+Settings available from setup, reconfigure, and options apply to that entry only:
 
 - **Dashboard path**: The dashboard that reacts to the knob.
 - **Enable knob navigation**: Global on/off control for knob navigation.
@@ -138,7 +144,7 @@ Settings available from setup, reconfigure, and options:
 
 ## Entities
 
-The integration creates these entities on its service device:
+The integration creates these entities on each entry's service device:
 
 - `switch.navigation_enabled`: Main enable/pause control.
 - `switch.overlay_enabled`: Shows or hides the tab overlay.
@@ -149,7 +155,7 @@ The integration creates these entities on its service device:
 - `sensor.last_rotation`: Last selected-knob rotation direction.
 - `sensor.last_navigation_result`: Last frontend navigation result reported by a browser.
 
-Entity IDs can be renamed by Home Assistant. Use the entity registry values from your system when creating automations.
+Entity IDs can be renamed by Home Assistant and may include suffixes when multiple knobs are configured. Use the entity registry values from your system when creating automations.
 
 ## Browser Targeting
 
@@ -165,12 +171,12 @@ Both `?kiosk` and `?kiosk=1` match. The value is not checked. This is a browser-
 
 ## Reconfiguration and Removal
 
-To select a different knob or dashboard:
+To select a different knob or dashboard for one entry:
 
 1. Go to **Settings -> Devices & services**.
 2. Open **Knob Swipe Navigation**.
 3. Choose **Reconfigure** or **Configure**.
-4. Update the ZHA knob, dashboard path, or navigation settings.
+4. Update the ZHA knob, dashboard path, or navigation settings. The same physical knob cannot be selected by two entries.
 
 To remove the integration:
 
@@ -181,7 +187,7 @@ To remove the integration:
 
 ## Data Updates
 
-The backend stores the selected ZHA device ID and navigation settings in the config entry. It listens to the selected knob's `zha_event` events and forwards normalized `next`/`previous` rotations to subscribed dashboard browsers through an integration-owned WebSocket subscription. Rotation handling is event-driven; there is no polling interval.
+The backend stores the selected ZHA device ID, capability profile, and navigation settings in each config entry. It listens to each selected knob's profile event stream and forwards normalized `next`/`previous` rotations to subscribed dashboard browsers through an integration-owned WebSocket subscription. Rotation handling is event-driven; there is no polling interval.
 
 The backend also updates `event.rotation` and `sensor.last_rotation` even when no browser navigates. Browsers report navigation results back to the backend for `sensor.last_navigation_result`.
 
@@ -193,7 +199,7 @@ Diagnostics can be downloaded from the integration entry in **Settings -> Device
 
 - Redacted config entry data and options.
 - Frontend module URL.
-- Navigation settings.
+- Capability profile and navigation settings.
 - Integration entity IDs.
 - Whether the selected device is configured and found.
 - Selected device name, manufacturer, model, and linked config entry domains.
@@ -205,10 +211,10 @@ Diagnostics do not include tokens, passwords, coordinates, or the raw configured
 The frontend module:
 
 1. Loads in Home Assistant as a frontend JavaScript module.
-2. Reads the configured ZHA knob device ID, dashboard path, settings, and entity IDs from the backend.
-3. Subscribes to integration-owned rotation events.
-4. Ignores events from every other device.
-5. Ignores browsers that are not displaying the configured dashboard path.
+2. Reads all configured ZHA knob entries, dashboard paths, capability profiles, settings, and entity IDs from the backend.
+3. Subscribes to integration-owned rotation events for every configured entry.
+4. Matches each rotation to the correct entry by `entry_id` and `device_id`.
+5. Ignores browsers that are not displaying the matching entry's configured dashboard path.
 6. Reads the real Lovelace tab names, paths, and icons from the current dashboard.
 7. Shows an overlay using those real tab names and icons when enabled.
 8. Moves to the next or previous tab.
@@ -288,7 +294,7 @@ If you need to report a problem:
 - ZHA only.
 - Rotation only.
 - Press actions are not handled.
-- One configured dashboard path is supported.
+- Each config entry supports one dashboard path; add another entry for another knob/dashboard pair.
 - URL query targeting identifies browser URLs only; it does not identify a physical device.
 - The integration does not update knob firmware or software; ZHA and the device manufacturer handle that.
 

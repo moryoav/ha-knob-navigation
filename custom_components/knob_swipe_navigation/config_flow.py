@@ -8,9 +8,11 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_DEVICE_ID
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_CAPABILITY_PROFILE,
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
     CONF_NAVIGATION_ENABLED,
@@ -18,6 +20,7 @@ from .const import (
     CONF_OVERLAY_TIMEOUT_MS,
     CONF_REQUIRE_QUERY_PARAM,
     CONF_WRAP_ENABLED,
+    DEFAULT_CAPABILITY_PROFILE,
     DEFAULT_NAME,
     DOMAIN,
     MAX_COOLDOWN_MS,
@@ -27,6 +30,8 @@ from .const import (
 )
 from .helpers import (
     configured_device_id,
+    device_name,
+    device_unique_id,
     is_zha_device,
     settings_from_entry,
     settings_from_mapping,
@@ -121,6 +126,30 @@ def _entry_schema(
     )
 
 
+def _entry_title(hass: HomeAssistant, device_id: str) -> str:
+    """Return a readable config entry title for a selected knob."""
+    name = device_name(hass, device_id)
+    return f"{DEFAULT_NAME}: {name}" if name else DEFAULT_NAME
+
+
+def _device_already_configured(
+    hass: HomeAssistant,
+    *,
+    device_id: str,
+    unique_id: str,
+    current_entry_id: str | None = None,
+) -> bool:
+    """Return true if another entry already uses this physical knob."""
+    return any(
+        entry.entry_id != current_entry_id
+        and (
+            entry.unique_id == unique_id
+            or configured_device_id(entry) == device_id
+        )
+        for entry in hass.config_entries.async_entries(DOMAIN)
+    )
+
+
 def _options_schema(settings: KnobSwipeNavigationSettings) -> vol.Schema:
     """Return the options schema."""
     return vol.Schema(_settings_schema(settings))
@@ -130,7 +159,7 @@ class KnobSwipeNavigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Knob Swipe Navigation."""
 
     VERSION = 1
-    MINOR_VERSION = 3
+    MINOR_VERSION = 4
 
     @staticmethod
     def async_get_options_flow(
@@ -149,13 +178,23 @@ class KnobSwipeNavigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             device_id = _device_id_from_input(user_input)
             if not is_zha_device(self.hass, device_id):
                 errors[FORM_DEVICE_ID] = "not_zha_device"
+            elif _device_already_configured(
+                self.hass,
+                device_id=device_id,
+                unique_id=device_unique_id(self.hass, device_id),
+            ):
+                errors[FORM_DEVICE_ID] = "already_configured"
             else:
-                await self.async_set_unique_id(DOMAIN)
+                unique_id = device_unique_id(self.hass, device_id)
+                await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
                 settings = _settings_from_input(user_input)
                 return self.async_create_entry(
-                    title=DEFAULT_NAME,
-                    data={CONF_DEVICE_ID: device_id},
+                    title=_entry_title(self.hass, device_id),
+                    data={
+                        CONF_DEVICE_ID: device_id,
+                        CONF_CAPABILITY_PROFILE: DEFAULT_CAPABILITY_PROFILE,
+                    },
                     options=settings_to_options(settings),
                 )
 
@@ -178,17 +217,26 @@ class KnobSwipeNavigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             device_id = _device_id_from_input(user_input)
             if not is_zha_device(self.hass, device_id):
                 errors[FORM_DEVICE_ID] = "not_zha_device"
+            elif _device_already_configured(
+                self.hass,
+                device_id=device_id,
+                unique_id=device_unique_id(self.hass, device_id),
+                current_entry_id=entry.entry_id,
+            ):
+                errors[FORM_DEVICE_ID] = "already_configured"
             else:
-                await self.async_set_unique_id(DOMAIN)
-                self._abort_if_unique_id_mismatch()
+                unique_id = device_unique_id(self.hass, device_id)
+                data = dict(entry.data)
+                data[CONF_DEVICE_ID] = device_id
+                data[CONF_CAPABILITY_PROFILE] = DEFAULT_CAPABILITY_PROFILE
                 self.hass.config_entries.async_update_entry(
                     entry,
+                    data=data,
                     options=settings_to_options(_settings_from_input(user_input)),
+                    title=_entry_title(self.hass, device_id),
+                    unique_id=unique_id,
                 )
-                return self.async_update_reload_and_abort(
-                    entry,
-                    data_updates={CONF_DEVICE_ID: device_id},
-                )
+                return self.async_update_reload_and_abort(entry)
 
         return self.async_show_form(
             step_id="reconfigure",

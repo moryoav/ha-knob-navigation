@@ -9,7 +9,7 @@ from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, FRONTEND_MODULE_URL
+from .const import CONF_CAPABILITY_PROFILE, DOMAIN, FRONTEND_MODULE_URL
 from .helpers import configured_device_id, device_config_entry_domains, settings_from_entry
 from .models import KnobSwipeNavigationConfigEntry
 
@@ -24,6 +24,11 @@ async def async_get_config_entry_diagnostics(
     device = dr.async_get(hass).async_get(device_id) if device_id else None
     runtime_data = getattr(entry, "runtime_data", None)
     settings = runtime_data.settings if runtime_data else settings_from_entry(entry)
+    capability_profile = (
+        runtime_data.capability_profile.profile_id
+        if runtime_data
+        else entry.data.get(CONF_CAPABILITY_PROFILE)
+    )
 
     return {
         "entry": {
@@ -39,6 +44,7 @@ async def async_get_config_entry_diagnostics(
             "module_url": FRONTEND_MODULE_URL,
         },
         "settings": {
+            "capability_profile": capability_profile,
             "dashboard_path": settings.dashboard_path,
             "navigation_enabled": settings.navigation_enabled,
             "overlay_enabled": settings.overlay_enabled,

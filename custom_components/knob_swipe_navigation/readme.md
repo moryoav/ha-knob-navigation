@@ -1,6 +1,6 @@
 # Knob Swipe Navigation
 
-Knob Swipe Navigation lets one configured ZHA rotary knob change tabs on one configured Lovelace dashboard. The ZHA knob, dashboard path, overlay, cooldown, wrap behavior, and optional URL query targeting are configured from **Settings -> Devices & services**.
+Knob Swipe Navigation lets configured ZHA rotary knobs change tabs on configured Lovelace dashboards. Each config entry maps one ZHA knob to one dashboard path with its own overlay, cooldown, wrap behavior, URL query targeting, entities, and diagnostics.
 
 No dashboard YAML block or template helper is required.
 
@@ -12,6 +12,9 @@ No dashboard YAML block or template helper is required.
 4. Select the ZHA rotary knob device.
 5. Enter the dashboard path to control, for example `lovelace` or `dashboard-home`.
 6. Choose the navigation settings and finish setup.
+7. Repeat **Add integration** for each additional knob.
+
+Version `0.3.0` is a breaking change from the previous singleton setup. Remove the old entry after upgrading and recreate one entry per knob.
 
 The rotation cooldown defaults to `2000` milliseconds (2 seconds).
 
@@ -25,7 +28,7 @@ All normal, visible tabs in the selected dashboard are affected. Subviews and hi
 
 ## Entities
 
-The integration creates these entities on its service device:
+The integration creates these entities on each entry's service device:
 
 - `switch.navigation_enabled`: Main enable/pause control.
 - `switch.overlay_enabled`: Shows or hides the tab overlay.
@@ -36,7 +39,7 @@ The integration creates these entities on its service device:
 - `sensor.last_rotation`: Last selected-knob rotation direction.
 - `sensor.last_navigation_result`: Last frontend navigation result reported by a browser.
 
-Entity IDs can be renamed by Home Assistant. Use the entity registry values from your system when creating automations.
+Entity IDs can be renamed by Home Assistant and may include suffixes when multiple knobs are configured. Use the entity registry values from your system when creating automations.
 
 Reload already-open dashboard browsers after changing the selected dashboard path, selected knob, or URL query targeting. The switch and number entities are read live from Home Assistant state and do not need a browser reload.
 
@@ -52,7 +55,7 @@ Both `?kiosk` and `?kiosk=1` match. This targets browser URLs only; it is not a 
 
 ## Supported Devices
 
-Supported devices are ZHA rotary knob devices that emit `zha_event` events with:
+Supported devices are ZHA rotary knob devices that match the included `zha_rotate_type` capability profile and emit `zha_event` events with:
 
 - `command: rotate_type`
 - `params.rotate_type: 0` or first `args` item `0` for next tab

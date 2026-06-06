@@ -22,10 +22,12 @@ from custom_components.knob_swipe_navigation import (
     websocket_subscribe_rotations,
 )
 from custom_components.knob_swipe_navigation.const import (
+    CONF_CAPABILITY_PROFILE,
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
     CONF_NAVIGATION_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
+    DEFAULT_CAPABILITY_PROFILE,
     DEFAULT_COOLDOWN_MS,
     DEFAULT_DASHBOARD_PATH,
     DOMAIN,
@@ -33,6 +35,7 @@ from custom_components.knob_swipe_navigation.const import (
     EVENT_ZHA,
     REPAIR_ISSUE_DEVICE_NOT_ZHA,
     ROTATION_NEXT,
+    ROTATION_PREVIOUS,
     WS_TYPE_CONFIG,
     WS_TYPE_NAVIGATION_RESULT,
     WS_TYPE_SUBSCRIBE_ROTATIONS,
@@ -135,6 +138,54 @@ async def test_setup_entry_tracks_selected_knob_rotation(
     assert entry.runtime_data.last_rotation_value == 0
 
 
+async def test_setup_entry_tracks_multiple_knobs_independently(
+    hass: HomeAssistant,
+) -> None:
+    """Test rotation events update only the matching knob entry."""
+    kitchen_device = _create_device(hass, name="Kitchen knob")
+    bedroom_device = _create_device(hass, name="Bedroom knob")
+    kitchen_entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="zha:kitchen_knob",
+        data={CONF_DEVICE_ID: kitchen_device.id},
+    )
+    bedroom_entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="zha:bedroom_knob",
+        data={CONF_DEVICE_ID: bedroom_device.id},
+    )
+    kitchen_entry.add_to_hass(hass)
+    bedroom_entry.add_to_hass(hass)
+    hass.http = Mock()
+    hass.http.async_register_static_paths = AsyncMock()
+
+    with (
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            AsyncMock(return_value=True),
+        ),
+        patch("custom_components.knob_swipe_navigation.frontend.add_extra_js_url"),
+    ):
+        assert await async_setup_entry(hass, kitchen_entry)
+        assert await async_setup_entry(hass, bedroom_entry)
+
+    hass.bus.async_fire(
+        EVENT_ZHA,
+        {
+            "device_id": bedroom_device.id,
+            "command": "rotate_type",
+            "params": {"rotate_type": 1},
+            "args": [1],
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert kitchen_entry.runtime_data.last_rotation is None
+    assert bedroom_entry.runtime_data.last_rotation == ROTATION_PREVIOUS
+    assert bedroom_entry.runtime_data.last_rotation_value == 1
+
+
 async def test_setup_entry_raises_and_creates_repair_issue_for_invalid_device(
     hass: HomeAssistant,
 ) -> None:
@@ -150,7 +201,9 @@ async def test_setup_entry_raises_and_creates_repair_issue_for_invalid_device(
     with pytest.raises(ConfigEntryError):
         await async_setup_entry(hass, entry)
 
-    issue = ir.async_get(hass).async_get_issue(DOMAIN, REPAIR_ISSUE_DEVICE_NOT_ZHA)
+    issue = ir.async_get(hass).async_get_issue(
+        DOMAIN, f"{REPAIR_ISSUE_DEVICE_NOT_ZHA}_{entry.entry_id}"
+    )
     assert issue is not None
 
 
@@ -158,6 +211,10 @@ async def test_unload_entry_removes_frontend_resource(hass: HomeAssistant) -> No
     """Test unload removes the frontend module."""
     entry = MockConfigEntry(domain=DOMAIN, unique_id=DOMAIN)
     entry.add_to_hass(hass)
+    hass.data[DOMAIN] = {
+        "frontend_registered": True,
+        "loaded_entry_ids": {entry.entry_id},
+    }
 
     with (
         patch.object(
@@ -190,11 +247,14 @@ async def test_migrate_entry_moves_options_device_to_data(
     entry.add_to_hass(hass)
 
     assert await async_migrate_entry(hass, entry)
-    assert entry.data == {CONF_DEVICE_ID: device.id}
+    assert entry.data == {
+        CONF_DEVICE_ID: device.id,
+        CONF_CAPABILITY_PROFILE: DEFAULT_CAPABILITY_PROFILE,
+    }
     assert entry.options[CONF_DASHBOARD_PATH] == DEFAULT_DASHBOARD_PATH
     assert entry.options[CONF_COOLDOWN_MS] == DEFAULT_COOLDOWN_MS
     assert entry.options[CONF_NAVIGATION_ENABLED] is True
-    assert entry.minor_version == 3
+    assert entry.minor_version == 4
 
 
 def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
@@ -224,13 +284,21 @@ def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
     websocket_config(hass, connection, {"id": 1, "type": WS_TYPE_CONFIG})
 
     result = connection.send_result.call_args.args[1]
-    assert result["device_id"] == "device-id"
-    assert result["dashboard_path"] == "dashboard-home"
-    assert result["overlay_timeout_ms"] == 1800
-    assert result["entities"][ENTITY_NAVIGATION_ENABLED] == (
+    assert result["rotation_subscription_type"] == WS_TYPE_SUBSCRIBE_ROTATIONS
+    assert len(result["entries"]) == 1
+    entry_config = result["entries"][0]
+    assert entry_config["entry_id"] == entry.entry_id
+    assert entry_config["device_id"] == "device-id"
+    assert entry_config["dashboard_path"] == "dashboard-home"
+    assert entry_config["overlay_timeout_ms"] == 1800
+    assert entry_config["capability_profile"]["id"] == DEFAULT_CAPABILITY_PROFILE
+    assert entry_config["capability_profile"]["rotate"] == {
+        "0": ROTATION_NEXT,
+        "1": "previous",
+    }
+    assert entry_config["entities"][ENTITY_NAVIGATION_ENABLED] == (
         "switch.knob_navigation_enabled"
     )
-    assert result["rotation_subscription_type"] == WS_TYPE_SUBSCRIBE_ROTATIONS
 
 
 def test_websocket_subscribe_rotations_forwards_backend_events(
@@ -264,7 +332,9 @@ def test_websocket_subscribe_rotations_forwards_backend_events(
         rotation_signal(entry.entry_id),
         RotationEventData(
             direction=ROTATION_NEXT,
-            rotate_type=0,
+            value=0,
+            value_attribute="rotate_type",
+            capability_profile=DEFAULT_CAPABILITY_PROFILE,
             event_data={},
         ),
     )
@@ -272,7 +342,15 @@ def test_websocket_subscribe_rotations_forwards_backend_events(
     message = connection.send_message.call_args.args[0]
     assert message["id"] == 7
     assert message["type"] == "event"
-    assert message["event"] == {"direction": ROTATION_NEXT, "rotate_type": 0}
+    assert message["event"] == {
+        "entry_id": entry.entry_id,
+        "device_id": "device-id",
+        "direction": ROTATION_NEXT,
+        "value": 0,
+        "value_attribute": "rotate_type",
+        "capability_profile": DEFAULT_CAPABILITY_PROFILE,
+        "rotate_type": 0,
+    }
 
 
 def test_websocket_navigation_result_updates_runtime_data(

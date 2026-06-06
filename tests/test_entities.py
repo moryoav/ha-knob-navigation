@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.knob_swipe_navigation.const import (
     CONF_COOLDOWN_MS,
     CONF_NAVIGATION_ENABLED,
+    DEFAULT_CAPABILITY_PROFILE,
     DOMAIN,
     ENTITY_COOLDOWN_MS,
     ENTITY_LAST_NAVIGATION_RESULT,
@@ -116,12 +117,20 @@ async def test_event_entity_triggers_rotation_event(hass: HomeAssistant) -> None
     event._handle_rotation(
         RotationEventData(
             direction=ROTATION_NEXT,
-            rotate_type=0,
+            value=0,
+            value_attribute="rotate_type",
+            capability_profile=DEFAULT_CAPABILITY_PROFILE,
             event_data={},
         )
     )
 
-    event._trigger_event.assert_called_once_with(ROTATION_NEXT, {"rotate_type": 0})
+    event._trigger_event.assert_called_once_with(
+        ROTATION_NEXT,
+        {
+            "rotate_type": 0,
+            "capability_profile": DEFAULT_CAPABILITY_PROFILE,
+        },
+    )
     event.async_write_ha_state.assert_called_once()
 
 
@@ -130,6 +139,8 @@ async def test_sensor_setup_and_values(hass: HomeAssistant) -> None:
     entry = _entry(hass)
     entry.runtime_data.last_rotation = ROTATION_NEXT
     entry.runtime_data.last_rotation_value = 0
+    entry.runtime_data.last_rotation_value_attribute = "rotate_type"
+    entry.runtime_data.last_rotation_capability_profile = DEFAULT_CAPABILITY_PROFILE
     entry.runtime_data.last_navigation_result = "navigated"
     entry.runtime_data.last_navigation_details = {"dashboard_path": "lovelace"}
     entities: list[object] = []
@@ -142,6 +153,10 @@ async def test_sensor_setup_and_values(hass: HomeAssistant) -> None:
     assert isinstance(result_sensor, KnobSwipeNavigationLastNavigationResultSensor)
     assert rotation_sensor.native_value == ROTATION_NEXT
     assert rotation_sensor.extra_state_attributes["rotate_type"] == 0
+    assert (
+        rotation_sensor.extra_state_attributes["capability_profile"]
+        == DEFAULT_CAPABILITY_PROFILE
+    )
     assert result_sensor.native_value == "navigated"
     assert result_sensor.extra_state_attributes["dashboard_path"] == "lovelace"
 

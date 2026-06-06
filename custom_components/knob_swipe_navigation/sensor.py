@@ -65,7 +65,11 @@ class KnobSwipeNavigationLastRotationSensor(KnobSwipeNavigationEntity, SensorEnt
         runtime_data = self._entry.runtime_data
         attrs: dict[str, Any] = {}
         if runtime_data.last_rotation_value is not None:
-            attrs["rotate_type"] = runtime_data.last_rotation_value
+            attrs[
+                runtime_data.last_rotation_value_attribute or "rotation_value"
+            ] = runtime_data.last_rotation_value
+        if runtime_data.last_rotation_capability_profile is not None:
+            attrs["capability_profile"] = runtime_data.last_rotation_capability_profile
         if runtime_data.last_rotation_at is not None:
             attrs["last_seen"] = runtime_data.last_rotation_at.isoformat()
         return attrs

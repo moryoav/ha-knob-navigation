@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
 from .const import (
+    CONF_CAPABILITY_PROFILE,
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
     CONF_NAVIGATION_ENABLED,
@@ -33,6 +34,7 @@ from .const import (
     SIGNAL_ROTATION,
 )
 from .models import KnobSwipeNavigationConfigEntry, KnobSwipeNavigationSettings
+from .profiles import RotationCapabilityProfile, capability_profile_from_id
 
 ZHA_DOMAIN = "zha"
 
@@ -40,6 +42,43 @@ ZHA_DOMAIN = "zha"
 def configured_device_id(entry: ConfigEntry) -> str | None:
     """Return the configured knob device id from a config entry."""
     return entry.data.get(CONF_DEVICE_ID) or entry.options.get(CONF_DEVICE_ID)
+
+
+def configured_capability_profile_id(entry: ConfigEntry) -> str | None:
+    """Return the stored capability profile id from a config entry."""
+    return entry.data.get(CONF_CAPABILITY_PROFILE) or entry.options.get(
+        CONF_CAPABILITY_PROFILE
+    )
+
+
+def capability_profile_from_entry(
+    entry: ConfigEntry,
+) -> RotationCapabilityProfile:
+    """Return the capability profile stored for a config entry."""
+    return capability_profile_from_id(configured_capability_profile_id(entry))
+
+
+def device_unique_id(hass: HomeAssistant, device_id: str) -> str:
+    """Return the config-entry unique id for a ZHA device."""
+    device = dr.async_get(hass).async_get(device_id)
+    if device is not None:
+        zha_identifiers = sorted(
+            str(identifier)
+            for domain, identifier in device.identifiers
+            if domain == ZHA_DOMAIN
+        )
+        if zha_identifiers:
+            return f"{ZHA_DOMAIN}:{zha_identifiers[0]}"
+
+    return f"device:{device_id}"
+
+
+def device_name(hass: HomeAssistant, device_id: str) -> str | None:
+    """Return a friendly device name for a Home Assistant device id."""
+    device = dr.async_get(hass).async_get(device_id)
+    if device is None:
+        return None
+    return device.name_by_user or device.name
 
 
 def normalize_dashboard_path(value: Any) -> str:

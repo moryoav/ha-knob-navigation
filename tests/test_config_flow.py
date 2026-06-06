@@ -22,12 +22,14 @@ from custom_components.knob_swipe_navigation.config_flow import (
     FORM_WRAP_ENABLED,
 )
 from custom_components.knob_swipe_navigation.const import (
+    CONF_CAPABILITY_PROFILE,
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
     CONF_NAVIGATION_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
     CONF_REQUIRE_QUERY_PARAM,
     CONF_WRAP_ENABLED,
+    DEFAULT_CAPABILITY_PROFILE,
     DEFAULT_NAME,
     DOMAIN,
 )
@@ -86,8 +88,11 @@ async def test_user_flow_creates_entry_for_zha_device(hass: HomeAssistant) -> No
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == DEFAULT_NAME
-    assert result["data"] == {CONF_DEVICE_ID: device.id}
+    assert result["title"] == f"{DEFAULT_NAME}: Rotary knob"
+    assert result["data"] == {
+        CONF_DEVICE_ID: device.id,
+        CONF_CAPABILITY_PROFILE: DEFAULT_CAPABILITY_PROFILE,
+    }
     options = result.get("options") or result["result"].options
     assert options[CONF_DASHBOARD_PATH] == "dashboard-home"
     assert options[CONF_OVERLAY_TIMEOUT_MS] == 1800
@@ -114,14 +119,14 @@ async def test_user_flow_rejects_non_zha_device(hass: HomeAssistant) -> None:
     assert result["errors"] == {FORM_DEVICE_ID: "not_zha_device"}
 
 
-async def test_user_flow_enforces_single_config_entry(
+async def test_user_flow_rejects_duplicate_knob(
     hass: HomeAssistant,
 ) -> None:
-    """Test the user flow prevents duplicate setup."""
+    """Test the user flow prevents duplicate setup for one physical knob."""
     device = _create_device(hass)
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id=DOMAIN,
+        unique_id="zha:rotary_knob",
         data={CONF_DEVICE_ID: device.id},
     )
     entry.add_to_hass(hass)
@@ -131,8 +136,40 @@ async def test_user_flow_enforces_single_config_entry(
         context={"source": config_entries.SOURCE_USER},
     )
 
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "single_instance_allowed"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {FORM_DEVICE_ID: device.id, **_settings_input()},
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {FORM_DEVICE_ID: "already_configured"}
+
+
+async def test_user_flow_allows_multiple_different_knobs(
+    hass: HomeAssistant,
+) -> None:
+    """Test the user flow allows multiple physical knobs."""
+    existing_device = _create_device(hass, name="Kitchen knob")
+    new_device = _create_device(hass, name="Bedroom knob")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="zha:kitchen_knob",
+        data={CONF_DEVICE_ID: existing_device.id},
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+    )
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {FORM_DEVICE_ID: new_device.id, **_settings_input()},
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == f"{DEFAULT_NAME}: Bedroom knob"
 
 
 async def test_reconfigure_flow_updates_existing_entry(
@@ -143,7 +180,7 @@ async def test_reconfigure_flow_updates_existing_entry(
     new_device = _create_device(hass, name="New knob")
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id=DOMAIN,
+        unique_id="zha:old_knob",
         data={CONF_DEVICE_ID: old_device.id},
     )
     entry.add_to_hass(hass)
@@ -174,6 +211,8 @@ async def test_reconfigure_flow_updates_existing_entry(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_DEVICE_ID] == new_device.id
+    assert entry.data[CONF_CAPABILITY_PROFILE] == DEFAULT_CAPABILITY_PROFILE
+    assert entry.unique_id == "zha:new_knob"
     assert entry.options[CONF_DASHBOARD_PATH] == "lovelace"
     assert entry.options[CONF_OVERLAY_TIMEOUT_MS] == 3200
     schedule_reload.assert_called_once_with(entry.entry_id)
@@ -184,7 +223,7 @@ async def test_options_flow_updates_navigation_options(hass: HomeAssistant) -> N
     device = _create_device(hass)
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id=DOMAIN,
+        unique_id="zha:rotary_knob",
         data={CONF_DEVICE_ID: device.id},
     )
     entry.add_to_hass(hass)
