@@ -13,6 +13,8 @@ No dashboard YAML block or template helper is required.
 5. Enter the dashboard path to control, for example `lovelace` or `dashboard-home`.
 6. Choose the navigation settings and finish setup.
 
+The rotation cooldown defaults to `2000` milliseconds (2 seconds).
+
 The dashboard path is the first URL segment:
 
 - `/lovelace/home` -> `lovelace`

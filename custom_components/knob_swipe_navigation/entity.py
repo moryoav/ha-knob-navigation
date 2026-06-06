@@ -7,9 +7,30 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, Entity, EntityCategory
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    ENTITY_COOLDOWN_MS,
+    ENTITY_LAST_NAVIGATION_RESULT,
+    ENTITY_LAST_ROTATION,
+    ENTITY_NAVIGATION_ENABLED,
+    ENTITY_OVERLAY_ENABLED,
+    ENTITY_OVERLAY_TIMEOUT_MS,
+    ENTITY_ROTATION,
+    ENTITY_WRAP_ENABLED,
+)
 from .helpers import update_runtime_settings
 from .models import KnobSwipeNavigationConfigEntry
+
+FRIENDLY_ENTITY_NAMES = {
+    ENTITY_NAVIGATION_ENABLED: "Knob navigation",
+    ENTITY_OVERLAY_ENABLED: "Tab overlay",
+    ENTITY_WRAP_ENABLED: "Tab wraparound",
+    ENTITY_OVERLAY_TIMEOUT_MS: "Overlay display time",
+    ENTITY_COOLDOWN_MS: "Rotation cooldown",
+    ENTITY_ROTATION: "Knob rotation",
+    ENTITY_LAST_ROTATION: "Last knob rotation",
+    ENTITY_LAST_NAVIGATION_RESULT: "Last navigation result",
+}
 
 
 class KnobSwipeNavigationEntity(Entity):
@@ -29,6 +50,7 @@ class KnobSwipeNavigationEntity(Entity):
         self._entry = entry
         self._entity_key = entity_key
         self._attr_unique_id = f"{entry.entry_id}_{entity_key}"
+        self._attr_name = FRIENDLY_ENTITY_NAMES.get(entity_key)
         self._attr_translation_key = entity_key
         self._attr_entity_category = entity_category
 

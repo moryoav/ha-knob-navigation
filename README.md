@@ -129,11 +129,11 @@ All normal, visible tabs in that dashboard are affected. Subviews and hidden vie
 Settings available from setup, reconfigure, and options:
 
 - **Dashboard path**: The dashboard that reacts to the knob.
-- **Navigation enabled**: Global on/off control for knob navigation.
-- **Overlay enabled**: Shows the tab overlay before moving tabs.
-- **Overlay timeout**: Overlay visibility in milliseconds. Defaults to `2800`.
-- **Cooldown**: Ignores repeated rotations for this many milliseconds. Defaults to `0`.
-- **Wrap tabs**: Allows moving from last to first tab and first to last tab.
+- **Enable knob navigation**: Global on/off control for knob navigation.
+- **Show tab overlay**: Shows the tab overlay before moving tabs.
+- **Overlay display time**: Overlay visibility in milliseconds. Defaults to `2800`.
+- **Rotation cooldown**: Ignores repeated rotations for this many milliseconds. Defaults to `2000` (2 seconds).
+- **Wrap from last tab to first**: Allows moving from last to first tab and first to last tab.
 - **Required URL query parameter**: Optional browser targeting guard.
 
 ## Entities

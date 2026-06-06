@@ -7,6 +7,7 @@ from custom_components.knob_swipe_navigation.const import (
     CONF_DASHBOARD_PATH,
     CONF_NAVIGATION_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
+    DEFAULT_COOLDOWN_MS,
     DEFAULT_DASHBOARD_PATH,
     MAX_COOLDOWN_MS,
 )
@@ -43,6 +44,11 @@ def test_settings_from_mapping_clamps_and_defaults() -> None:
     assert settings.navigation_enabled is False
     assert settings.overlay_timeout_ms == 10000
     assert settings.cooldown_ms == 0
+
+
+def test_settings_from_mapping_uses_default_cooldown() -> None:
+    """Test cooldown defaults to two seconds when it is not configured."""
+    assert settings_from_mapping({}).cooldown_ms == DEFAULT_COOLDOWN_MS
 
 
 def test_settings_to_options_round_trip() -> None:

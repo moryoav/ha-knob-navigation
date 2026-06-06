@@ -1,4 +1,4 @@
-const KNOB_SWIPE_NAV_VERSION = "0.2.1";
+const KNOB_SWIPE_NAV_VERSION = "0.2.2";
 const WS_CONFIG_TYPE = "knob_swipe_navigation/config";
 const WS_SUBSCRIBE_ROTATIONS_TYPE = "knob_swipe_navigation/subscribe_rotations";
 const WS_NAVIGATION_RESULT_TYPE = "knob_swipe_navigation/navigation_result";
@@ -195,7 +195,7 @@ function navigationSettings() {
     cooldownMs: entityNumber(
       hass,
       entities.cooldown_ms,
-      state.config.cooldown_ms ?? 0,
+      state.config.cooldown_ms ?? 2000,
       0,
       10000,
     ),

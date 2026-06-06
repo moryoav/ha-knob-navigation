@@ -11,11 +11,20 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.knob_swipe_navigation.config_flow import (
+    FORM_COOLDOWN_MS,
+    FORM_DASHBOARD_PATH,
+    FORM_DEVICE_ID,
+    FORM_NAVIGATION_ENABLED,
+    FORM_OVERLAY_ENABLED,
+    FORM_OVERLAY_TIMEOUT_MS,
+    FORM_REQUIRE_QUERY_PARAM,
+    FORM_WRAP_ENABLED,
+)
 from custom_components.knob_swipe_navigation.const import (
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
     CONF_NAVIGATION_ENABLED,
-    CONF_OVERLAY_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
     CONF_REQUIRE_QUERY_PARAM,
     CONF_WRAP_ENABLED,
@@ -24,16 +33,21 @@ from custom_components.knob_swipe_navigation.const import (
 )
 
 
+def _schema_keys(result: config_entries.ConfigFlowResult) -> set[str]:
+    """Return user-facing schema keys from a form result."""
+    return {key.schema for key in result["data_schema"].schema}
+
+
 def _settings_input() -> dict[str, object]:
     """Return valid settings input."""
     return {
-        CONF_DASHBOARD_PATH: "/dashboard-home/default_view?kiosk",
-        CONF_NAVIGATION_ENABLED: True,
-        CONF_OVERLAY_ENABLED: True,
-        CONF_OVERLAY_TIMEOUT_MS: 1800,
-        CONF_COOLDOWN_MS: 250,
-        CONF_WRAP_ENABLED: False,
-        CONF_REQUIRE_QUERY_PARAM: "kiosk",
+        FORM_DASHBOARD_PATH: "/dashboard-home/default_view?kiosk",
+        FORM_NAVIGATION_ENABLED: True,
+        FORM_OVERLAY_ENABLED: True,
+        FORM_OVERLAY_TIMEOUT_MS: 1800,
+        FORM_COOLDOWN_MS: 250,
+        FORM_WRAP_ENABLED: False,
+        FORM_REQUIRE_QUERY_PARAM: "kiosk",
     }
 
 
@@ -60,10 +74,15 @@ async def test_user_flow_creates_entry_for_zha_device(hass: HomeAssistant) -> No
     )
 
     assert result["type"] is FlowResultType.FORM
+    schema_keys = _schema_keys(result)
+    assert FORM_DEVICE_ID in schema_keys
+    assert FORM_NAVIGATION_ENABLED in schema_keys
+    assert CONF_DEVICE_ID not in schema_keys
+    assert CONF_NAVIGATION_ENABLED not in schema_keys
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {CONF_DEVICE_ID: device.id, **_settings_input()},
+        {FORM_DEVICE_ID: device.id, **_settings_input()},
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -88,11 +107,11 @@ async def test_user_flow_rejects_non_zha_device(hass: HomeAssistant) -> None:
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {CONF_DEVICE_ID: device.id, **_settings_input()},
+        {FORM_DEVICE_ID: device.id, **_settings_input()},
     )
 
     assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {CONF_DEVICE_ID: "not_zha_device"}
+    assert result["errors"] == {FORM_DEVICE_ID: "not_zha_device"}
 
 
 async def test_user_flow_enforces_single_config_entry(
@@ -143,11 +162,11 @@ async def test_reconfigure_flow_updates_existing_entry(
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {
-                CONF_DEVICE_ID: new_device.id,
+                FORM_DEVICE_ID: new_device.id,
                 **{
                     **_settings_input(),
-                    CONF_DASHBOARD_PATH: "lovelace/tablet",
-                    CONF_OVERLAY_TIMEOUT_MS: 3200,
+                    FORM_DASHBOARD_PATH: "lovelace/tablet",
+                    FORM_OVERLAY_TIMEOUT_MS: 3200,
                 },
             },
         )
@@ -178,8 +197,8 @@ async def test_options_flow_updates_navigation_options(hass: HomeAssistant) -> N
         result["flow_id"],
         {
             **_settings_input(),
-            CONF_DASHBOARD_PATH: "http://homeassistant.local:8123/kitchen/0",
-            CONF_NAVIGATION_ENABLED: False,
+            FORM_DASHBOARD_PATH: "http://homeassistant.local:8123/kitchen/0",
+            FORM_NAVIGATION_ENABLED: False,
         },
     )
 

@@ -34,28 +34,72 @@ from .helpers import (
 )
 from .models import KnobSwipeNavigationConfigEntry, KnobSwipeNavigationSettings
 
+FORM_DEVICE_ID = "ZHA knob device"
+FORM_DASHBOARD_PATH = "Dashboard path"
+FORM_NAVIGATION_ENABLED = "Enable knob navigation"
+FORM_OVERLAY_ENABLED = "Show tab overlay"
+FORM_OVERLAY_TIMEOUT_MS = "Overlay display time"
+FORM_COOLDOWN_MS = "Rotation cooldown"
+FORM_WRAP_ENABLED = "Wrap from last tab to first"
+FORM_REQUIRE_QUERY_PARAM = "Required URL query parameter"
+
+_SETTINGS_FORM_TO_OPTION_KEYS = {
+    FORM_DASHBOARD_PATH: CONF_DASHBOARD_PATH,
+    FORM_NAVIGATION_ENABLED: CONF_NAVIGATION_ENABLED,
+    FORM_OVERLAY_ENABLED: CONF_OVERLAY_ENABLED,
+    FORM_OVERLAY_TIMEOUT_MS: CONF_OVERLAY_TIMEOUT_MS,
+    FORM_COOLDOWN_MS: CONF_COOLDOWN_MS,
+    FORM_WRAP_ENABLED: CONF_WRAP_ENABLED,
+    FORM_REQUIRE_QUERY_PARAM: CONF_REQUIRE_QUERY_PARAM,
+}
+
+
+def _input_value(
+    user_input: dict[str, Any], form_key: str, option_key: str
+) -> Any:
+    """Return a value submitted with either the friendly or stored key."""
+    if form_key in user_input:
+        return user_input[form_key]
+    return user_input[option_key]
+
+
+def _device_id_from_input(user_input: dict[str, Any]) -> str:
+    """Return the selected device id from form input."""
+    return str(_input_value(user_input, FORM_DEVICE_ID, CONF_DEVICE_ID))
+
+
+def _settings_from_input(user_input: dict[str, Any]) -> KnobSwipeNavigationSettings:
+    """Return settings from user input with friendly form keys."""
+    return settings_from_mapping(
+        {
+            option_key: _input_value(user_input, form_key, option_key)
+            for form_key, option_key in _SETTINGS_FORM_TO_OPTION_KEYS.items()
+            if form_key in user_input or option_key in user_input
+        }
+    )
+
 
 def _settings_schema(settings: KnobSwipeNavigationSettings) -> dict[Any, Any]:
     """Return the navigation settings schema."""
     return {
-        vol.Required(CONF_DASHBOARD_PATH, default=settings.dashboard_path): str,
+        vol.Required(FORM_DASHBOARD_PATH, default=settings.dashboard_path): str,
         vol.Required(
-            CONF_NAVIGATION_ENABLED, default=settings.navigation_enabled
+            FORM_NAVIGATION_ENABLED, default=settings.navigation_enabled
         ): bool,
-        vol.Required(CONF_OVERLAY_ENABLED, default=settings.overlay_enabled): bool,
+        vol.Required(FORM_OVERLAY_ENABLED, default=settings.overlay_enabled): bool,
         vol.Required(
-            CONF_OVERLAY_TIMEOUT_MS, default=settings.overlay_timeout_ms
+            FORM_OVERLAY_TIMEOUT_MS, default=settings.overlay_timeout_ms
         ): vol.All(
             vol.Coerce(int),
             vol.Range(min=MIN_OVERLAY_TIMEOUT_MS, max=MAX_OVERLAY_TIMEOUT_MS),
         ),
-        vol.Required(CONF_COOLDOWN_MS, default=settings.cooldown_ms): vol.All(
+        vol.Required(FORM_COOLDOWN_MS, default=settings.cooldown_ms): vol.All(
             vol.Coerce(int),
             vol.Range(min=MIN_COOLDOWN_MS, max=MAX_COOLDOWN_MS),
         ),
-        vol.Required(CONF_WRAP_ENABLED, default=settings.wrap_enabled): bool,
+        vol.Required(FORM_WRAP_ENABLED, default=settings.wrap_enabled): bool,
         vol.Optional(
-            CONF_REQUIRE_QUERY_PARAM, default=settings.require_query_param
+            FORM_REQUIRE_QUERY_PARAM, default=settings.require_query_param
         ): str,
     }
 
@@ -65,9 +109,9 @@ def _entry_schema(
 ) -> vol.Schema:
     """Return the setup/reconfigure schema."""
     device_key = (
-        vol.Required(CONF_DEVICE_ID, default=default_device_id)
+        vol.Required(FORM_DEVICE_ID, default=default_device_id)
         if default_device_id
-        else vol.Required(CONF_DEVICE_ID)
+        else vol.Required(FORM_DEVICE_ID)
     )
     return vol.Schema(
         {
@@ -102,13 +146,13 @@ class KnobSwipeNavigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            device_id = user_input[CONF_DEVICE_ID]
+            device_id = _device_id_from_input(user_input)
             if not is_zha_device(self.hass, device_id):
-                errors[CONF_DEVICE_ID] = "not_zha_device"
+                errors[FORM_DEVICE_ID] = "not_zha_device"
             else:
                 await self.async_set_unique_id(DOMAIN)
                 self._abort_if_unique_id_configured()
-                settings = settings_from_mapping(user_input)
+                settings = _settings_from_input(user_input)
                 return self.async_create_entry(
                     title=DEFAULT_NAME,
                     data={CONF_DEVICE_ID: device_id},
@@ -131,15 +175,15 @@ class KnobSwipeNavigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         current_settings = settings_from_entry(entry)
 
         if user_input is not None:
-            device_id = user_input[CONF_DEVICE_ID]
+            device_id = _device_id_from_input(user_input)
             if not is_zha_device(self.hass, device_id):
-                errors[CONF_DEVICE_ID] = "not_zha_device"
+                errors[FORM_DEVICE_ID] = "not_zha_device"
             else:
                 await self.async_set_unique_id(DOMAIN)
                 self._abort_if_unique_id_mismatch()
                 self.hass.config_entries.async_update_entry(
                     entry,
-                    options=settings_to_options(settings_from_mapping(user_input)),
+                    options=settings_to_options(_settings_from_input(user_input)),
                 )
                 return self.async_update_reload_and_abort(
                     entry,
@@ -162,7 +206,7 @@ class KnobSwipeNavigationOptionsFlow(config_entries.OptionsFlowWithReload):
         """Manage options."""
         if user_input is not None:
             return self.async_create_entry(
-                data=settings_to_options(settings_from_mapping(user_input))
+                data=settings_to_options(_settings_from_input(user_input))
             )
 
         return self.async_show_form(

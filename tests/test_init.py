@@ -22,9 +22,11 @@ from custom_components.knob_swipe_navigation import (
     websocket_subscribe_rotations,
 )
 from custom_components.knob_swipe_navigation.const import (
+    CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
     CONF_NAVIGATION_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
+    DEFAULT_COOLDOWN_MS,
     DEFAULT_DASHBOARD_PATH,
     DOMAIN,
     ENTITY_NAVIGATION_ENABLED,
@@ -190,6 +192,7 @@ async def test_migrate_entry_moves_options_device_to_data(
     assert await async_migrate_entry(hass, entry)
     assert entry.data == {CONF_DEVICE_ID: device.id}
     assert entry.options[CONF_DASHBOARD_PATH] == DEFAULT_DASHBOARD_PATH
+    assert entry.options[CONF_COOLDOWN_MS] == DEFAULT_COOLDOWN_MS
     assert entry.options[CONF_NAVIGATION_ENABLED] is True
     assert entry.minor_version == 3
 
