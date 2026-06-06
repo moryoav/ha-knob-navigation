@@ -2,29 +2,36 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import logging
+from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
 
 from homeassistant.components import frontend, websocket_api
-from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryError
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 
-from .const import DOMAIN, FRONTEND_MODULE_URL, FRONTEND_URL_PATH, WS_TYPE_CONFIG
+from .const import (
+    DEFAULT_NAME,
+    DOMAIN,
+    FRONTEND_MODULE_URL,
+    FRONTEND_URL_PATH,
+    REPAIR_ISSUE_DEVICE_NOT_ZHA,
+    WS_TYPE_CONFIG,
+)
+from .helpers import configured_device_id, is_zha_device
+from .models import KnobSwipeNavigationConfigEntry, KnobSwipeNavigationRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
-
-KnobSwipeNavigationConfigEntry = ConfigEntry
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the integration."""
-    hass.data.setdefault(DOMAIN, {})
     websocket_api.async_register_command(hass, websocket_config)
     return True
 
@@ -33,7 +40,25 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: KnobSwipeNavigationConfigEntry
 ) -> bool:
     """Set up a config entry."""
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry
+    device_id = configured_device_id(entry)
+    if not device_id or not is_zha_device(hass, device_id):
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            REPAIR_ISSUE_DEVICE_NOT_ZHA,
+            is_fixable=False,
+            issue_domain=DOMAIN,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key=REPAIR_ISSUE_DEVICE_NOT_ZHA,
+        )
+        raise ConfigEntryError(
+            translation_domain=DOMAIN,
+            translation_key=REPAIR_ISSUE_DEVICE_NOT_ZHA,
+        )
+
+    ir.async_delete_issue(hass, DOMAIN, REPAIR_ISSUE_DEVICE_NOT_ZHA)
+    entry.runtime_data = KnobSwipeNavigationRuntimeData(device_id=device_id)
+    _async_register_service_device(hass, entry)
 
     www_path = Path(__file__).parent / "www"
     try:
@@ -44,7 +69,6 @@ async def async_setup_entry(
         _LOGGER.debug("Frontend static path already registered")
     frontend.add_extra_js_url(hass, FRONTEND_MODULE_URL, es5=False)
 
-    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
 
@@ -52,16 +76,54 @@ async def async_unload_entry(
     hass: HomeAssistant, entry: KnobSwipeNavigationConfigEntry
 ) -> bool:
     """Unload a config entry."""
-    hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     frontend.remove_extra_js_url(hass, FRONTEND_MODULE_URL, es5=False)
     return True
 
 
-async def _async_update_listener(
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: KnobSwipeNavigationConfigEntry
+) -> bool:
+    """Migrate old config entries."""
+    if entry.version > 1:
+        return False
+
+    if entry.minor_version < 2:
+        data = dict(entry.data)
+        if device_id := configured_device_id(entry):
+            data[CONF_DEVICE_ID] = device_id
+        hass.config_entries.async_update_entry(
+            entry,
+            data=data,
+            options={},
+            version=1,
+            minor_version=2,
+        )
+
+    return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    config_entry: KnobSwipeNavigationConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> bool:
+    """Allow removal of the integration's service device."""
+    return (DOMAIN, config_entry.entry_id) in device_entry.identifiers
+
+
+def _async_register_service_device(
     hass: HomeAssistant, entry: KnobSwipeNavigationConfigEntry
 ) -> None:
-    """Reload the integration after options change."""
-    await hass.config_entries.async_reload(entry.entry_id)
+    """Register the frontend navigation service device."""
+    device_entry = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        entry_type=dr.DeviceEntryType.SERVICE,
+        identifiers={(DOMAIN, entry.entry_id)},
+        manufacturer="moryoav",
+        model="Frontend dashboard navigation bridge",
+        translation_key="navigation_bridge",
+    )
+    entry.runtime_data.service_device_id = device_entry.id
 
 
 def _configured_device_id(hass: HomeAssistant) -> str | None:
@@ -69,8 +131,15 @@ def _configured_device_id(hass: HomeAssistant) -> str | None:
     entries = hass.config_entries.async_entries(DOMAIN)
     if not entries:
         return None
-    entry = entries[0]
-    return entry.options.get(CONF_DEVICE_ID) or entry.data.get(CONF_DEVICE_ID)
+
+    for entry in entries:
+        runtime_data = getattr(entry, "runtime_data", None)
+        if runtime_data and runtime_data.device_id:
+            return runtime_data.device_id
+        if device_id := configured_device_id(entry):
+            return device_id
+
+    return None
 
 
 @callback

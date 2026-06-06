@@ -1,0 +1,5 @@
+coverage[toml]
+homeassistant>=2026.3.0
+pytest
+pytest-asyncio
+pytest-homeassistant-custom-component

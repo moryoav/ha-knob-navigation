@@ -1,0 +1,95 @@
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: Integration does not register service actions.
+  appropriate-polling:
+    status: exempt
+    comment: Integration is local push and does not poll.
+  brands: done
+  common-modules: done
+  config-flow-test-coverage: done
+  config-flow: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: Integration does not register service actions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  entity-unique-id:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  has-entity-name:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: Integration does not register service actions.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  integration-owner: done
+  log-when-unavailable:
+    status: exempt
+    comment: Integration has no device connection loop or entity availability state.
+  parallel-updates:
+    status: exempt
+    comment: Integration does not expose entity platforms.
+  reauthentication-flow:
+    status: exempt
+    comment: Integration does not authenticate with a device or service.
+  test-coverage: done
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: The selected ZHA knob is discovered by ZHA; this service has no network address to update.
+  discovery:
+    status: exempt
+    comment: The integration cannot reliably auto-discover which ZHA device a user wants for dashboard navigation.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: Integration creates one static service device and has no child devices.
+  entity-category:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  entity-device-class:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  entity-disabled-by-default:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  entity-translations:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  exception-translations: done
+  icon-translations:
+    status: exempt
+    comment: Integration does not expose Home Assistant entities.
+  reconfiguration-flow: done
+  repair-issues: done
+  stale-devices:
+    status: exempt
+    comment: Integration creates one static service device and has no stale child devices to prune.

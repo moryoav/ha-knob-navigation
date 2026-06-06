@@ -14,3 +14,5 @@ EVENT_ZHA = "zha_event"
 COMMAND_ROTATE_TYPE = "rotate_type"
 
 DEFAULT_NAME = "Knob Swipe Navigation"
+
+REPAIR_ISSUE_DEVICE_NOT_ZHA = "device_not_zha"
