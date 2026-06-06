@@ -181,9 +181,9 @@ To remove the integration:
 
 ## Data Updates
 
-The backend stores the selected ZHA device ID and navigation settings in the config entry. The frontend receives those values through a Home Assistant WebSocket command, subscribes to `zha_event`, and performs navigation in the browser. Rotation handling is event-driven; there is no polling interval.
+The backend stores the selected ZHA device ID and navigation settings in the config entry. It listens to the selected knob's `zha_event` events and forwards normalized `next`/`previous` rotations to subscribed dashboard browsers through an integration-owned WebSocket subscription. Rotation handling is event-driven; there is no polling interval.
 
-The backend also listens to the selected knob's `zha_event` events so the `event.rotation` and `sensor.last_rotation` entities update even when no browser navigates. Browsers report navigation results back to the backend for `sensor.last_navigation_result`.
+The backend also updates `event.rotation` and `sensor.last_rotation` even when no browser navigates. Browsers report navigation results back to the backend for `sensor.last_navigation_result`.
 
 Dashboard tab metadata is read from the currently loaded Lovelace config. If you rename tabs, change paths, change icons, change the selected dashboard path, change the selected knob, or change URL query targeting, reload the browser that is showing the dashboard. The switch and number entities are read live from Home Assistant state and do not need a browser reload.
 
@@ -206,7 +206,7 @@ The frontend module:
 
 1. Loads in Home Assistant as a frontend JavaScript module.
 2. Reads the configured ZHA knob device ID, dashboard path, settings, and entity IDs from the backend.
-3. Subscribes to `zha_event`.
+3. Subscribes to integration-owned rotation events.
 4. Ignores events from every other device.
 5. Ignores browsers that are not displaying the configured dashboard path.
 6. Reads the real Lovelace tab names, paths, and icons from the current dashboard.

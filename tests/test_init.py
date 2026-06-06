@@ -10,6 +10,7 @@ from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.knob_swipe_navigation import (
@@ -18,6 +19,7 @@ from custom_components.knob_swipe_navigation import (
     async_unload_entry,
     websocket_config,
     websocket_navigation_result,
+    websocket_subscribe_rotations,
 )
 from custom_components.knob_swipe_navigation.const import (
     CONF_DASHBOARD_PATH,
@@ -31,10 +33,13 @@ from custom_components.knob_swipe_navigation.const import (
     ROTATION_NEXT,
     WS_TYPE_CONFIG,
     WS_TYPE_NAVIGATION_RESULT,
+    WS_TYPE_SUBSCRIBE_ROTATIONS,
 )
+from custom_components.knob_swipe_navigation.helpers import rotation_signal
 from custom_components.knob_swipe_navigation.models import (
     KnobSwipeNavigationRuntimeData,
     KnobSwipeNavigationSettings,
+    RotationEventData,
 )
 
 
@@ -222,6 +227,49 @@ def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
     assert result["entities"][ENTITY_NAVIGATION_ENABLED] == (
         "switch.knob_navigation_enabled"
     )
+    assert result["rotation_subscription_type"] == WS_TYPE_SUBSCRIBE_ROTATIONS
+
+
+def test_websocket_subscribe_rotations_forwards_backend_events(
+    hass: HomeAssistant,
+) -> None:
+    """Test browsers can subscribe to selected-knob backend rotations."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=DOMAIN,
+        data={CONF_DEVICE_ID: "device-id"},
+    )
+    entry.runtime_data = KnobSwipeNavigationRuntimeData(
+        device_id="device-id",
+        settings=KnobSwipeNavigationSettings(),
+    )
+    entry.add_to_hass(hass)
+    connection = Mock()
+    connection.subscriptions = {}
+
+    websocket_subscribe_rotations(
+        hass,
+        connection,
+        {"id": 7, "type": WS_TYPE_SUBSCRIBE_ROTATIONS},
+    )
+
+    assert 7 in connection.subscriptions
+    connection.send_result.assert_called_once_with(7)
+
+    async_dispatcher_send(
+        hass,
+        rotation_signal(entry.entry_id),
+        RotationEventData(
+            direction=ROTATION_NEXT,
+            rotate_type=0,
+            event_data={},
+        ),
+    )
+
+    message = connection.send_message.call_args.args[0]
+    assert message["id"] == 7
+    assert message["type"] == "event"
+    assert message["event"] == {"direction": ROTATION_NEXT, "rotate_type": 0}
 
 
 def test_websocket_navigation_result_updates_runtime_data(

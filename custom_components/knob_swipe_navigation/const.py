@@ -6,9 +6,10 @@ DOMAIN = "knob_swipe_navigation"
 
 FRONTEND_URL_PATH = "/knob_swipe_navigation"
 FRONTEND_MODULE = "knob-swipe-navigation.js"
-FRONTEND_MODULE_URL = f"{FRONTEND_URL_PATH}/{FRONTEND_MODULE}?v=0.2.0"
+FRONTEND_MODULE_URL = f"{FRONTEND_URL_PATH}/{FRONTEND_MODULE}?v=0.2.1"
 
 WS_TYPE_CONFIG = f"{DOMAIN}/config"
+WS_TYPE_SUBSCRIBE_ROTATIONS = f"{DOMAIN}/subscribe_rotations"
 WS_TYPE_NAVIGATION_RESULT = f"{DOMAIN}/navigation_result"
 
 EVENT_ZHA = "zha_event"

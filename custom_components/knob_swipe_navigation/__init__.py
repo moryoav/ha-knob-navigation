@@ -16,7 +16,10 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -38,6 +41,7 @@ from .const import (
     ROTATION_PREVIOUS,
     WS_TYPE_CONFIG,
     WS_TYPE_NAVIGATION_RESULT,
+    WS_TYPE_SUBSCRIBE_ROTATIONS,
 )
 from .helpers import (
     configured_device_id,
@@ -68,6 +72,7 @@ PLATFORMS = [
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the integration."""
     websocket_api.async_register_command(hass, websocket_config)
+    websocket_api.async_register_command(hass, websocket_subscribe_rotations)
     websocket_api.async_register_command(hass, websocket_navigation_result)
     return True
 
@@ -312,6 +317,7 @@ def websocket_config(
                 "0": ROTATION_NEXT,
                 "1": ROTATION_PREVIOUS,
             },
+            "rotation_subscription_type": WS_TYPE_SUBSCRIBE_ROTATIONS,
             "dashboard_path": settings.dashboard_path,
             "navigation_enabled": settings.navigation_enabled,
             "overlay_enabled": settings.overlay_enabled,
@@ -322,6 +328,41 @@ def websocket_config(
             "entities": _entity_ids(entry) if runtime_data else {},
         },
     )
+
+
+@callback
+@websocket_api.websocket_command({vol.Required("type"): WS_TYPE_SUBSCRIBE_ROTATIONS})
+def websocket_subscribe_rotations(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Subscribe a frontend browser to selected-knob rotation events."""
+    entry = _configured_entry(hass)
+    if not entry:
+        connection.send_error(
+            msg["id"], "not_configured", "Knob Swipe Navigation is not configured"
+        )
+        return
+
+    @callback
+    def _forward_rotation(data: RotationEventData) -> None:
+        connection.send_message(
+            websocket_api.event_message(
+                msg["id"],
+                {
+                    "direction": data.direction,
+                    "rotate_type": data.rotate_type,
+                },
+            )
+        )
+
+    connection.subscriptions[msg["id"]] = async_dispatcher_connect(
+        hass,
+        rotation_signal(entry.entry_id),
+        _forward_rotation,
+    )
+    connection.send_result(msg["id"])
 
 
 @callback

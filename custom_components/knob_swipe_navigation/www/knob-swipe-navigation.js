@@ -1,5 +1,6 @@
-const KNOB_SWIPE_NAV_VERSION = "0.2.0";
+const KNOB_SWIPE_NAV_VERSION = "0.2.1";
 const WS_CONFIG_TYPE = "knob_swipe_navigation/config";
+const WS_SUBSCRIBE_ROTATIONS_TYPE = "knob_swipe_navigation/subscribe_rotations";
 const WS_NAVIGATION_RESULT_TYPE = "knob_swipe_navigation/navigation_result";
 const OVERLAY_ID = "knob-swipe-navigation-overlay";
 const STYLE_ID = "knob-swipe-navigation-style";
@@ -68,6 +69,7 @@ function waitForHass() {
         resolve(hass);
       } else if (attempts > 120) {
         window.clearInterval(timer);
+        resolve(null);
       }
     }, 500);
   });
@@ -699,6 +701,35 @@ function handleZhaEvent(event) {
   handleRotate(direction);
 }
 
+function handleBackendRotation(event) {
+  const payload = event?.event || event || {};
+  const direction = payload.direction;
+  if (direction !== "next" && direction !== "previous") return;
+  handleRotate(direction);
+}
+
+async function subscribeRotations(hass) {
+  const connection = getConnection(hass);
+  if (!connection) return;
+
+  const subscriptionType =
+    state.config?.rotation_subscription_type || WS_SUBSCRIBE_ROTATIONS_TYPE;
+  if (typeof connection.subscribeMessage === "function") {
+    try {
+      state.unsubscribe = await connection.subscribeMessage(handleBackendRotation, {
+        type: subscriptionType,
+      });
+      return;
+    } catch (_err) {
+      state.unsubscribe = null;
+    }
+  }
+
+  if (typeof connection.subscribeEvents === "function") {
+    state.unsubscribe = await connection.subscribeEvents(handleZhaEvent, "zha_event");
+  }
+}
+
 async function init() {
   if (window.__knobSwipeNavigationInitialized) return;
   window.__knobSwipeNavigationInitialized = true;
@@ -707,9 +738,7 @@ async function init() {
   if (!hass) return;
   await loadBackendConfig(hass);
 
-  const connection = getConnection(hass);
-  if (!connection?.subscribeEvents) return;
-  state.unsubscribe = await connection.subscribeEvents(handleZhaEvent, "zha_event");
+  await subscribeRotations(hass);
 }
 
 window.knobSwipeNavigation = {
