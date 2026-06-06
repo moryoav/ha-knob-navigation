@@ -14,6 +14,7 @@ from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
 
 from .const import (
@@ -28,6 +29,8 @@ from .helpers import configured_device_id, is_zha_device
 from .models import KnobSwipeNavigationConfigEntry, KnobSwipeNavigationRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
