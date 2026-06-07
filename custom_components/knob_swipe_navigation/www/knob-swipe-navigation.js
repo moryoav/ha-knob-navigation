@@ -1,13 +1,18 @@
-const KNOB_SWIPE_NAV_VERSION = "0.3.0";
+const KNOB_SWIPE_NAV_VERSION = "0.3.2";
 const WS_CONFIG_TYPE = "knob_swipe_navigation/config";
 const WS_SUBSCRIBE_ROTATIONS_TYPE = "knob_swipe_navigation/subscribe_rotations";
 const WS_NAVIGATION_RESULT_TYPE = "knob_swipe_navigation/navigation_result";
 const OVERLAY_ID = "knob-swipe-navigation-overlay";
 const STYLE_ID = "knob-swipe-navigation-style";
+const INIT_FLAG = "__knobSwipeNavigationInitialized";
+const VERSION_FLAG = "__knobSwipeNavigationVersion";
 const DEFAULT_DASHBOARD_PATH = "lovelace";
 const DEFAULT_OVERLAY_TIMEOUT = 2800;
+const CONFIG_RETRY_MS = 5000;
+const CONFIG_REFRESH_MS = 60000;
 const SWIPE_ANIMATION_MS = 220;
 const SWIPE_DELAY_MS = 32;
+const previousKnobSwipeNavigation = window.knobSwipeNavigation;
 
 const viewSelectors = [
   "home-assistant",
@@ -30,6 +35,8 @@ const state = {
   entries: [],
   entryStates: new Map(),
   unsubscribe: null,
+  refreshTimer: null,
+  refreshInFlight: null,
 };
 
 function deepQuery(selectors) {
@@ -116,6 +123,50 @@ async function loadBackendConfig(hass) {
     state.config = null;
     state.entries = [];
     state.configLoaded = false;
+  }
+}
+
+function clearBackendRefreshTimer() {
+  if (state.refreshTimer) {
+    window.clearTimeout(state.refreshTimer);
+    state.refreshTimer = null;
+  }
+}
+
+function scheduleBackendRefresh(delay = CONFIG_REFRESH_MS) {
+  clearBackendRefreshTimer();
+  state.refreshTimer = window.setTimeout(() => {
+    state.refreshTimer = null;
+    refreshBackend().catch(() => {});
+  }, delay);
+}
+
+async function refreshBackend() {
+  if (state.refreshInFlight) return state.refreshInFlight;
+
+  state.refreshInFlight = (async () => {
+    const hass = await waitForHass();
+    if (!hass) {
+      scheduleBackendRefresh(CONFIG_RETRY_MS);
+      return false;
+    }
+
+    try {
+      await loadBackendConfig(hass);
+      if (state.configLoaded) {
+        await subscribeRotations(hass);
+      }
+    } catch (_err) {
+      state.configLoaded = false;
+    }
+    scheduleBackendRefresh(state.configLoaded ? CONFIG_REFRESH_MS : CONFIG_RETRY_MS);
+    return state.configLoaded;
+  })();
+
+  try {
+    return await state.refreshInFlight;
+  } finally {
+    state.refreshInFlight = null;
   }
 }
 
@@ -617,6 +668,16 @@ function entryByDeviceId(deviceId) {
   return state.entries.find((entry) => entry.device_id === deviceId) || null;
 }
 
+async function entryByRotationPayload(payload) {
+  let entry = entryById(payload?.entry_id) || entryByDeviceId(payload?.device_id);
+  if (!entry) {
+    await refreshBackend();
+    entry = entryById(payload?.entry_id) || entryByDeviceId(payload?.device_id);
+  }
+  if (!entry && state.entries.length === 1) return state.entries[0];
+  return entry;
+}
+
 function rotateValue(entry, eventData) {
   const profile = entry?.capability_profile || {};
   const valueParameter = profile.value_parameter || "rotate_type";
@@ -721,10 +782,13 @@ function handleRotate(entry, direction) {
   }, SWIPE_DELAY_MS);
 }
 
-function handleZhaEvent(event) {
-  if (!state.configLoaded) return;
+async function handleZhaEvent(event) {
+  if (!state.configLoaded) {
+    await refreshBackend();
+    if (!state.configLoaded) return;
+  }
   const data = event?.data || {};
-  const entry = entryByDeviceId(data.device_id);
+  const entry = await entryByRotationPayload({ device_id: data.device_id });
   if (!entry) return;
   const profile = entry.capability_profile || {};
   if (data.command !== profile.command) return;
@@ -735,9 +799,9 @@ function handleZhaEvent(event) {
   handleRotate(entry, direction);
 }
 
-function handleBackendRotation(event) {
+async function handleBackendRotation(event) {
   const payload = event?.event || event || {};
-  const entry = entryById(payload.entry_id) || entryByDeviceId(payload.device_id);
+  const entry = await entryByRotationPayload(payload);
   if (!entry) return;
   const direction = payload.direction;
   if (direction !== "next" && direction !== "previous") return;
@@ -748,7 +812,9 @@ async function subscribeRotations(hass) {
   const connection = getConnection(hass);
   if (!connection) return;
   if (typeof state.unsubscribe === "function") {
-    state.unsubscribe();
+    try {
+      state.unsubscribe();
+    } catch (_err) {}
     state.unsubscribe = null;
   }
   if (!state.entries.length) return;
@@ -776,34 +842,64 @@ async function subscribeRotations(hass) {
     ];
     const unsubscribers = [];
     for (const eventType of eventTypes) {
-      unsubscribers.push(await connection.subscribeEvents(handleZhaEvent, eventType));
+      try {
+        unsubscribers.push(await connection.subscribeEvents(handleZhaEvent, eventType));
+      } catch (_err) {}
     }
     state.unsubscribe = () => {
-      for (const unsubscribe of unsubscribers) unsubscribe();
+      for (const unsubscribe of unsubscribers) {
+        try {
+          unsubscribe();
+        } catch (_err) {}
+      }
     };
   }
 }
 
 async function init() {
-  if (window.__knobSwipeNavigationInitialized) return;
-  window.__knobSwipeNavigationInitialized = true;
-
-  const hass = await waitForHass();
-  if (!hass) return;
-  await loadBackendConfig(hass);
-
-  await subscribeRotations(hass);
+  if (window[INIT_FLAG] && window[VERSION_FLAG] === KNOB_SWIPE_NAV_VERSION) return;
+  if (typeof previousKnobSwipeNavigation?.destroy === "function") {
+    try {
+      previousKnobSwipeNavigation.destroy();
+    } catch (_err) {}
+  }
+  window[INIT_FLAG] = true;
+  window[VERSION_FLAG] = KNOB_SWIPE_NAV_VERSION;
+  await refreshBackend();
 }
 
 window.knobSwipeNavigation = {
   version: KNOB_SWIPE_NAV_VERSION,
   reloadConfig: async () => {
-    const hass = getHass();
-    if (hass) {
-      await loadBackendConfig(hass);
-      await subscribeRotations(hass);
+    await refreshBackend();
+  },
+  destroy: () => {
+    clearBackendRefreshTimer();
+    if (typeof state.unsubscribe === "function") {
+      try {
+        state.unsubscribe();
+      } catch (_err) {}
+    }
+    state.unsubscribe = null;
+    state.config = null;
+    state.entries = [];
+    state.configLoaded = false;
+    window[INIT_FLAG] = false;
+    if (window[VERSION_FLAG] === KNOB_SWIPE_NAV_VERSION) {
+      delete window[VERSION_FLAG];
     }
   },
+  debugState: () => ({
+    version: KNOB_SWIPE_NAV_VERSION,
+    configLoaded: state.configLoaded,
+    entryCount: state.entries.length,
+    entries: state.entries.map((entry) => ({
+      entry_id: entry.entry_id,
+      title: entry.title,
+      device_id: entry.device_id,
+      dashboard_path: entry.dashboard_path,
+    })),
+  }),
   showOverlay: () => {
     const settings = navigationSettings(state.entries[0]) || {
       overlay: true,

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 - 2026-06-07
+
+- Fix frontend recovery after upgrading from the single-knob runtime to multi-knob config entries without a full browser reload.
+- Retry frontend config/subscription setup after reconnects or early-load failures.
+
 ## 0.3.0 - 2026-06-06
 
 ### Breaking
