@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5 - 2026-06-07
+
+- Updated icons.
+
 ## 0.3.4 - 2026-06-07
 
 - Updated Icons.
