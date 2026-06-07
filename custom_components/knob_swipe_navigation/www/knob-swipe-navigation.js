@@ -1,4 +1,4 @@
-const KNOB_SWIPE_NAV_VERSION = "0.3.2";
+const KNOB_SWIPE_NAV_VERSION = "0.3.6";
 const WS_CONFIG_TYPE = "knob_swipe_navigation/config";
 const WS_SUBSCRIBE_ROTATIONS_TYPE = "knob_swipe_navigation/subscribe_rotations";
 const WS_NAVIGATION_RESULT_TYPE = "knob_swipe_navigation/navigation_result";
@@ -345,7 +345,24 @@ function ensureStyle() {
       filter: blur(2px) !important;
       pointer-events: none !important;
       transition: opacity 120ms ease, transform 160ms cubic-bezier(0.2, 0.9, 0.2, 1), filter 160ms ease !important;
-      color: white !important;
+      --knob-overlay-text-color: var(--text-color, #ffffff);
+      --knob-overlay-muted-color: color-mix(in srgb, var(--text-color, #ffffff) 62%, transparent);
+      --knob-overlay-panel-surface: color-mix(in srgb, var(--background-color-2, var(--background-color, #383e47)) 24%, black 76%);
+      --knob-overlay-panel-background: color-mix(in srgb, var(--knob-overlay-panel-surface) 82%, transparent);
+      --knob-overlay-shadow-surface: color-mix(in srgb, var(--border-color, #333333) 20%, black 80%);
+      --knob-overlay-shadow-color: color-mix(in srgb, var(--knob-overlay-shadow-surface) 42%, transparent);
+      --knob-overlay-panel-border: color-mix(in srgb, var(--text-color, #ffffff) 20%, transparent);
+      --knob-overlay-tab-border: color-mix(in srgb, var(--text-color, #ffffff) 8%, transparent);
+      --knob-overlay-tab-background: color-mix(in srgb, var(--text-color, #ffffff) 6%, transparent);
+      --knob-overlay-active-color: var(--label-badge-blue, var(--accent-color, rgba(67, 167, 255, 1)));
+      --knob-overlay-active-top: color-mix(in srgb, var(--knob-overlay-active-color) 75%, var(--text-color, #ffffff) 25%);
+      --knob-overlay-active-bottom: color-mix(in srgb, var(--knob-overlay-active-color) 70%, var(--background-color, #3b4049) 30%);
+      --knob-overlay-active-border: color-mix(in srgb, var(--knob-overlay-active-top) 72%, transparent);
+      --knob-overlay-active-top-fill: color-mix(in srgb, var(--knob-overlay-active-top) 42%, transparent);
+      --knob-overlay-active-bottom-fill: color-mix(in srgb, var(--knob-overlay-active-bottom) 34%, transparent);
+      --knob-overlay-active-glow: color-mix(in srgb, var(--knob-overlay-active-color) 30%, transparent);
+      --knob-overlay-inset-border: color-mix(in srgb, var(--text-color, #ffffff) 20%, transparent);
+      color: var(--knob-overlay-text-color) !important;
       font-family: Roboto, Arial, sans-serif !important;
       contain: layout style paint !important;
       isolation: isolate !important;
@@ -367,10 +384,10 @@ function ensureStyle() {
       align-items: center !important;
       gap: 12px !important;
       padding: 12px 14px !important;
-      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      border: 1px solid var(--knob-overlay-panel-border) !important;
       border-radius: 18px !important;
-      background: rgba(8, 12, 22, 0.82) !important;
-      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42) !important;
+      background: var(--knob-overlay-panel-background) !important;
+      box-shadow: 0 18px 48px var(--knob-overlay-shadow-color) !important;
       backdrop-filter: blur(18px) saturate(135%) !important;
       -webkit-backdrop-filter: blur(18px) saturate(135%) !important;
       transform-origin: bottom center !important;
@@ -386,10 +403,10 @@ function ensureStyle() {
       align-items: center !important;
       justify-content: center !important;
       gap: 6px !important;
-      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      border: 1px solid var(--knob-overlay-tab-border) !important;
       border-radius: 14px !important;
-      color: rgba(255, 255, 255, 0.62) !important;
-      background: rgba(255, 255, 255, 0.06) !important;
+      color: var(--knob-overlay-muted-color) !important;
+      background: var(--knob-overlay-tab-background) !important;
       transition: color 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease !important;
       will-change: transform, opacity !important;
     }
@@ -411,10 +428,10 @@ function ensureStyle() {
       letter-spacing: 0 !important;
     }
     #${OVERLAY_ID} .knob-tab.is-active {
-      color: white !important;
-      border-color: rgba(141, 213, 255, 0.72) !important;
-      background: linear-gradient(180deg, rgba(74, 173, 228, 0.42), rgba(51, 100, 198, 0.34)) !important;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 0 24px rgba(67, 167, 255, 0.3) !important;
+      color: var(--knob-overlay-text-color) !important;
+      border-color: var(--knob-overlay-active-border) !important;
+      background: linear-gradient(180deg, var(--knob-overlay-active-top-fill), var(--knob-overlay-active-bottom-fill)) !important;
+      box-shadow: inset 0 0 0 1px var(--knob-overlay-inset-border), 0 0 24px var(--knob-overlay-active-glow) !important;
     }
     #${OVERLAY_ID}.is-entering .knob-tab-panel {
       animation: knobSwipeOverlayPanelIn 190ms cubic-bezier(0.18, 0.9, 0.2, 1.18) both !important;

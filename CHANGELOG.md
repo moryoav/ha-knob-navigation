@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6 - 2026-06-07
+
+- Use Home Assistant theme colors for the tab overlay palette.
+
 ## 0.3.5 - 2026-06-07
 
 - Updated icons.
