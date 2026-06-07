@@ -14,8 +14,6 @@ No dashboard YAML block or template helper is required.
 6. Choose the navigation settings and finish setup.
 7. Repeat **Add integration** for each additional knob.
 
-Version `0.3.0` is a breaking change from the previous singleton setup. Remove the old entry after upgrading and recreate one entry per knob.
-
 The rotation cooldown defaults to `2000` milliseconds (2 seconds).
 
 The dashboard path is the first URL segment:
@@ -56,6 +54,8 @@ Both `?kiosk` and `?kiosk=1` match. This targets browser URLs only; it is not a 
 ## Supported Devices
 
 Supported devices are ZHA rotary knob devices that match the included `zha_rotate_type` capability profile and emit `zha_event` events with:
+
+Verified working product: [AliExpress ZHA rotary knob](https://s.click.aliexpress.com/e/_c3x3XjtJ). Other ZHA rotary knobs can work if they emit the same `rotate_type` events. If you try another product and confirm it works, please send a link so it can be added here.
 
 - `command: rotate_type`
 - `params.rotate_type: 0` or first `args` item `0` for next tab

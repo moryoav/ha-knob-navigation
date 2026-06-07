@@ -9,10 +9,6 @@ This version ships with the `zha_rotate_type` capability profile:
 - `rotate_type: 1` moves to the previous tab.
 - Press events are ignored.
 
-## Upgrade Note
-
-Version `0.3.0` changes config entries from a singleton integration entry to one entry per physical knob. Remove the old Knob Swipe Navigation entry after upgrading, then add the integration again for each knob you want to use.
-
 ## Requirements
 
 - Home Assistant 2026.3.0 or newer.
@@ -26,6 +22,8 @@ Fully Kiosk Browser is not a hard requirement. The integration runs in the Home 
 ## Supported Devices
 
 Supported devices are ZHA rotary knob devices that emit Home Assistant `zha_event` events in this shape:
+
+Verified working product: [AliExpress ZHA rotary knob](https://s.click.aliexpress.com/e/_c3x3XjtJ). Other ZHA rotary knobs can work if they emit the same `rotate_type` events. If you try another product and confirm it works, please send a link so it can be added here.
 
 ```json
 {

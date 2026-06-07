@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3 - 2026-06-07
+
+- Remove the outdated 0.3.0 upgrade note from the README.
+- Document the verified working ZHA rotary knob product link.
+
 ## 0.3.2 - 2026-06-07
 
 - Fix frontend recovery after upgrading from the single-knob runtime to multi-knob config entries without a full browser reload.
