@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4 - 2026-06-07
+
+- Updated Icons.
+
 ## 0.3.3 - 2026-06-07
 
 - Remove the outdated 0.3.0 upgrade note from the README.
