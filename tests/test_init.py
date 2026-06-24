@@ -25,12 +25,16 @@ from custom_components.knob_swipe_navigation.const import (
     CONF_CAPABILITY_PROFILE,
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
+    CONF_IDLE_RETURN_ENABLED,
+    CONF_IDLE_RETURN_TIMEOUT_SECONDS,
     CONF_NAVIGATION_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
     DEFAULT_CAPABILITY_PROFILE,
     DEFAULT_COOLDOWN_MS,
     DEFAULT_DASHBOARD_PATH,
+    DEFAULT_IDLE_RETURN_TIMEOUT_SECONDS,
     DOMAIN,
+    ENTITY_IDLE_RETURN_ENABLED,
     ENTITY_NAVIGATION_ENABLED,
     EVENT_ZHA,
     REPAIR_ISSUE_DEVICE_NOT_ZHA,
@@ -254,7 +258,12 @@ async def test_migrate_entry_moves_options_device_to_data(
     assert entry.options[CONF_DASHBOARD_PATH] == DEFAULT_DASHBOARD_PATH
     assert entry.options[CONF_COOLDOWN_MS] == DEFAULT_COOLDOWN_MS
     assert entry.options[CONF_NAVIGATION_ENABLED] is True
-    assert entry.minor_version == 4
+    assert entry.options[CONF_IDLE_RETURN_ENABLED] is True
+    assert (
+        entry.options[CONF_IDLE_RETURN_TIMEOUT_SECONDS]
+        == DEFAULT_IDLE_RETURN_TIMEOUT_SECONDS
+    )
+    assert entry.minor_version == 5
 
 
 def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
@@ -266,6 +275,7 @@ def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
         options={
             CONF_DASHBOARD_PATH: "dashboard-home",
             CONF_OVERLAY_TIMEOUT_MS: 1800,
+            CONF_IDLE_RETURN_TIMEOUT_SECONDS: 90,
         },
     )
     entry.runtime_data = KnobSwipeNavigationRuntimeData(
@@ -273,10 +283,14 @@ def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
         settings=KnobSwipeNavigationSettings(
             dashboard_path="dashboard-home",
             overlay_timeout_ms=1800,
+            idle_return_timeout_seconds=90,
         ),
     )
     entry.runtime_data.entity_ids[ENTITY_NAVIGATION_ENABLED] = (
         "switch.knob_navigation_enabled"
+    )
+    entry.runtime_data.entity_ids[ENTITY_IDLE_RETURN_ENABLED] = (
+        "switch.knob_idle_return_enabled"
     )
     entry.add_to_hass(hass)
     connection = Mock()
@@ -291,6 +305,8 @@ def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
     assert entry_config["device_id"] == "device-id"
     assert entry_config["dashboard_path"] == "dashboard-home"
     assert entry_config["overlay_timeout_ms"] == 1800
+    assert entry_config["idle_return_enabled"] is True
+    assert entry_config["idle_return_timeout_seconds"] == 90
     assert entry_config["capability_profile"]["id"] == DEFAULT_CAPABILITY_PROFILE
     assert entry_config["capability_profile"]["rotate"] == {
         "0": ROTATION_NEXT,
@@ -298,6 +314,9 @@ def test_websocket_config_returns_runtime_settings(hass: HomeAssistant) -> None:
     }
     assert entry_config["entities"][ENTITY_NAVIGATION_ENABLED] == (
         "switch.knob_navigation_enabled"
+    )
+    assert entry_config["entities"][ENTITY_IDLE_RETURN_ENABLED] == (
+        "switch.knob_idle_return_enabled"
     )
 
 

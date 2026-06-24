@@ -1,6 +1,6 @@
 # Knob Swipe Navigation
 
-Knob Swipe Navigation lets configured ZHA rotary knobs change tabs on configured Lovelace dashboards. Each config entry maps one ZHA knob to one dashboard path with its own overlay, cooldown, wrap behavior, URL query targeting, entities, and diagnostics.
+Knob Swipe Navigation lets configured ZHA rotary knobs change tabs on configured Lovelace dashboards. Each config entry maps one ZHA knob to one dashboard path with its own overlay, cooldown, idle return, wrap behavior, URL query targeting, entities, and diagnostics.
 
 No dashboard YAML block or template helper is required.
 
@@ -14,7 +14,7 @@ No dashboard YAML block or template helper is required.
 6. Choose the navigation settings and finish setup.
 7. Repeat **Add integration** for each additional knob.
 
-The rotation cooldown defaults to `2000` milliseconds (2 seconds).
+The rotation cooldown defaults to `2000` milliseconds (2 seconds). Idle return to the first visible tab is enabled by default and waits `60` seconds after the last knob touch.
 
 The dashboard path is the first URL segment:
 
@@ -31,8 +31,10 @@ The integration creates these entities on each entry's service device:
 - `switch.navigation_enabled`: Main enable/pause control.
 - `switch.overlay_enabled`: Shows or hides the tab overlay.
 - `switch.wrap_tabs`: Enables tab wrapping.
+- `switch.idle_return_enabled`: Enables returning to the first tab after knob inactivity.
 - `number.overlay_timeout`: Overlay timeout in milliseconds.
 - `number.cooldown`: Rotation cooldown in milliseconds.
+- `number.idle_return_timeout`: Idle return delay in seconds.
 - `event.rotation`: Fires `next` or `previous` when the selected knob rotates.
 - `sensor.last_rotation`: Last selected-knob rotation direction.
 - `sensor.last_navigation_result`: Last frontend navigation result reported by a browser.

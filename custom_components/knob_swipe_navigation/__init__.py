@@ -27,6 +27,8 @@ from .const import (
     DEFAULT_CAPABILITY_PROFILE,
     DOMAIN,
     ENTITY_COOLDOWN_MS,
+    ENTITY_IDLE_RETURN_ENABLED,
+    ENTITY_IDLE_RETURN_TIMEOUT_SECONDS,
     ENTITY_LAST_NAVIGATION_RESULT,
     ENTITY_LAST_ROTATION,
     ENTITY_NAVIGATION_ENABLED,
@@ -48,6 +50,7 @@ from .helpers import (
     navigation_result_signal,
     rotation_signal,
     settings_from_entry,
+    settings_from_mapping,
     settings_to_options,
 )
 from .models import (
@@ -170,12 +173,15 @@ async def async_migrate_entry(
     if entry.minor_version < 4:
         data.setdefault(CONF_CAPABILITY_PROFILE, DEFAULT_CAPABILITY_PROFILE)
 
+    if entry.minor_version < 5:
+        options = settings_to_options(settings_from_mapping(options))
+
     hass.config_entries.async_update_entry(
         entry,
         data=data,
         options=options,
         version=1,
-        minor_version=4,
+        minor_version=5,
     )
 
     return True
@@ -300,6 +306,12 @@ def _entity_ids(entry: KnobSwipeNavigationConfigEntry) -> dict[str, str]:
                 ENTITY_OVERLAY_TIMEOUT_MS
             ),
             ENTITY_COOLDOWN_MS: entry.runtime_data.entity_ids.get(ENTITY_COOLDOWN_MS),
+            ENTITY_IDLE_RETURN_ENABLED: entry.runtime_data.entity_ids.get(
+                ENTITY_IDLE_RETURN_ENABLED
+            ),
+            ENTITY_IDLE_RETURN_TIMEOUT_SECONDS: entry.runtime_data.entity_ids.get(
+                ENTITY_IDLE_RETURN_TIMEOUT_SECONDS
+            ),
             ENTITY_ROTATION: entry.runtime_data.entity_ids.get(ENTITY_ROTATION),
             ENTITY_LAST_ROTATION: entry.runtime_data.entity_ids.get(
                 ENTITY_LAST_ROTATION
@@ -336,6 +348,8 @@ def _entry_payload(entry: KnobSwipeNavigationConfigEntry) -> dict[str, Any]:
         "cooldown_ms": settings.cooldown_ms,
         "wrap_enabled": settings.wrap_enabled,
         "require_query_param": settings.require_query_param,
+        "idle_return_enabled": settings.idle_return_enabled,
+        "idle_return_timeout_seconds": settings.idle_return_timeout_seconds,
         "entities": _entity_ids(entry) if runtime_data else {},
     }
 

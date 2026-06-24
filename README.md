@@ -1,7 +1,7 @@
 # Knob Swipe Navigation
 [![HACS][hacs-badge]][hacs-url] [![release][release-badge]][release-url] ![downloads][downloads-badge] [![hassfest][hassfest-badge]][hassfest-url] [![validate][validate-badge]][validate-url] [![license][license-badge]][license-url]
 
-Knob Swipe Navigation is a Home Assistant custom integration that lets configured ZHA rotary knobs change tabs on configured Lovelace dashboards. Each config entry maps one knob to one dashboard path with its own navigation behavior, entities, cooldown, browser targeting, and diagnostics. Setup is handled from **Settings -> Devices & services**; no dashboard YAML block or template helper is required.
+Knob Swipe Navigation is a Home Assistant custom integration that lets configured ZHA rotary knobs change tabs on configured Lovelace dashboards. Each config entry maps one knob to one dashboard path with its own navigation behavior, idle return, entities, cooldown, browser targeting, and diagnostics. Setup is handled from **Settings -> Devices & services**; no dashboard YAML block or template helper is required.
 
 This version ships with the `zha_rotate_type` capability profile:
 
@@ -53,7 +53,7 @@ The integration provides:
 - UI reconfiguration for each selected knob and dashboard path.
 - One Home Assistant service device per configured knob.
 - A frontend module that subscribes to integration-owned rotation events for all configured knobs.
-- Per-knob config entities for enablement, overlay, wrap, overlay timeout, and cooldown.
+- Per-knob config entities for enablement, overlay, wrap, overlay timeout, cooldown, and idle return.
 - Per-knob diagnostic event/sensor entities for rotation and frontend navigation results.
 - Diagnostics download with redacted config entry data, capability profile, settings, entity IDs, and selected-device metadata.
 - A per-entry repair issue if a configured knob is no longer provided by ZHA.
@@ -83,7 +83,7 @@ After restart, add the integration in Home Assistant:
 2. Search for **Knob Swipe Navigation**.
 3. Select the ZHA rotary knob device.
 4. Enter the dashboard path to control, for example `lovelace` or `dashboard-home`.
-5. Choose overlay, cooldown, wrap, and optional URL query targeting settings.
+5. Choose overlay, cooldown, idle return, wrap, and optional URL query targeting settings.
 6. Finish setup.
 7. Repeat **Add integration** for each additional knob.
 
@@ -139,6 +139,8 @@ Settings available from setup, reconfigure, and options apply to that entry only
 - **Rotation cooldown**: Ignores repeated rotations for this many milliseconds. Defaults to `2000` (2 seconds).
 - **Wrap from last tab to first**: Allows moving from last to first tab and first to last tab.
 - **Required URL query parameter**: Optional browser targeting guard.
+- **Return to first tab after inactivity**: Returns the matching dashboard browser to the first visible tab when the selected knob has not been touched. Enabled by default.
+- **Inactivity return delay**: Seconds to wait before returning to the first visible tab. Defaults to `60`.
 
 ## Entities
 
@@ -147,8 +149,10 @@ The integration creates these entities on each entry's service device:
 - `switch.navigation_enabled`: Main enable/pause control.
 - `switch.overlay_enabled`: Shows or hides the tab overlay.
 - `switch.wrap_tabs`: Enables tab wrapping.
+- `switch.idle_return_enabled`: Enables returning to the first tab after knob inactivity.
 - `number.overlay_timeout`: Overlay timeout in milliseconds.
 - `number.cooldown`: Rotation cooldown in milliseconds.
+- `number.idle_return_timeout`: Idle return delay in seconds.
 - `event.rotation`: Fires `next` or `previous` when the selected knob rotates.
 - `sensor.last_rotation`: Last selected-knob rotation direction.
 - `sensor.last_navigation_result`: Last frontend navigation result reported by a browser.
@@ -185,7 +189,7 @@ To remove the integration:
 
 ## Data Updates
 
-The backend stores the selected ZHA device ID, capability profile, and navigation settings in each config entry. It listens to each selected knob's profile event stream and forwards normalized `next`/`previous` rotations to subscribed dashboard browsers through an integration-owned WebSocket subscription. Rotation handling is event-driven; there is no polling interval.
+The backend stores the selected ZHA device ID, capability profile, and navigation settings in each config entry. It listens to each selected knob's profile event stream and forwards normalized `next`/`previous` rotations to subscribed dashboard browsers through an integration-owned WebSocket subscription. Rotation handling is event-driven; the frontend uses per-entry timers only for the optional idle return.
 
 The backend also updates `event.rotation` and `sensor.last_rotation` even when no browser navigates. Browsers report navigation results back to the backend for `sensor.last_navigation_result`.
 
@@ -216,7 +220,8 @@ The frontend module:
 6. Reads the real Lovelace tab names, paths, and icons from the current dashboard.
 7. Shows an overlay using those real tab names and icons when enabled.
 8. Moves to the next or previous tab.
-9. Reports the navigation result back to Home Assistant.
+9. Resets that entry's idle-return timer when the knob is touched and, when enabled, returns to the first visible tab after the configured delay.
+10. Reports the navigation result back to Home Assistant.
 
 Because tab metadata is read from the loaded Lovelace dashboard, renaming tabs or changing icons automatically updates the overlay after the dashboard is reloaded.
 
@@ -229,6 +234,7 @@ Expected behavior:
 - Rotating right moves to the next dashboard tab.
 - Rotating left moves to the previous dashboard tab.
 - The overlay appears immediately and highlights the target tab when overlay is enabled.
+- If idle return is enabled, the dashboard returns to the first visible tab after the configured delay without knob activity.
 - Browsers outside the configured dashboard path do not react.
 - Browsers missing the configured URL query parameter do not react.
 

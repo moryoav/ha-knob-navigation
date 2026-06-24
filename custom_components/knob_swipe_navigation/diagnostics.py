@@ -52,6 +52,8 @@ async def async_get_config_entry_diagnostics(
             "cooldown_ms": settings.cooldown_ms,
             "wrap_enabled": settings.wrap_enabled,
             "require_query_param": settings.require_query_param,
+            "idle_return_enabled": settings.idle_return_enabled,
+            "idle_return_timeout_seconds": settings.idle_return_timeout_seconds,
         },
         "entities": dict(runtime_data.entity_ids) if runtime_data else {},
         "selected_device": {

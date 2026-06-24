@@ -15,6 +15,8 @@ from custom_components.knob_swipe_navigation.config_flow import (
     FORM_COOLDOWN_MS,
     FORM_DASHBOARD_PATH,
     FORM_DEVICE_ID,
+    FORM_IDLE_RETURN_ENABLED,
+    FORM_IDLE_RETURN_TIMEOUT_SECONDS,
     FORM_NAVIGATION_ENABLED,
     FORM_OVERLAY_ENABLED,
     FORM_OVERLAY_TIMEOUT_MS,
@@ -25,6 +27,8 @@ from custom_components.knob_swipe_navigation.const import (
     CONF_CAPABILITY_PROFILE,
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
+    CONF_IDLE_RETURN_ENABLED,
+    CONF_IDLE_RETURN_TIMEOUT_SECONDS,
     CONF_NAVIGATION_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
     CONF_REQUIRE_QUERY_PARAM,
@@ -50,6 +54,8 @@ def _settings_input() -> dict[str, object]:
         FORM_COOLDOWN_MS: 250,
         FORM_WRAP_ENABLED: False,
         FORM_REQUIRE_QUERY_PARAM: "kiosk",
+        FORM_IDLE_RETURN_ENABLED: True,
+        FORM_IDLE_RETURN_TIMEOUT_SECONDS: 45,
     }
 
 
@@ -79,6 +85,8 @@ async def test_user_flow_creates_entry_for_zha_device(hass: HomeAssistant) -> No
     schema_keys = _schema_keys(result)
     assert FORM_DEVICE_ID in schema_keys
     assert FORM_NAVIGATION_ENABLED in schema_keys
+    assert FORM_IDLE_RETURN_ENABLED in schema_keys
+    assert FORM_IDLE_RETURN_TIMEOUT_SECONDS in schema_keys
     assert CONF_DEVICE_ID not in schema_keys
     assert CONF_NAVIGATION_ENABLED not in schema_keys
 
@@ -99,6 +107,8 @@ async def test_user_flow_creates_entry_for_zha_device(hass: HomeAssistant) -> No
     assert options[CONF_COOLDOWN_MS] == 250
     assert options[CONF_WRAP_ENABLED] is False
     assert options[CONF_REQUIRE_QUERY_PARAM] == "kiosk"
+    assert options[CONF_IDLE_RETURN_ENABLED] is True
+    assert options[CONF_IDLE_RETURN_TIMEOUT_SECONDS] == 45
 
 
 async def test_user_flow_rejects_non_zha_device(hass: HomeAssistant) -> None:
@@ -204,6 +214,7 @@ async def test_reconfigure_flow_updates_existing_entry(
                     **_settings_input(),
                     FORM_DASHBOARD_PATH: "lovelace/tablet",
                     FORM_OVERLAY_TIMEOUT_MS: 3200,
+                    FORM_IDLE_RETURN_TIMEOUT_SECONDS: 120,
                 },
             },
         )
@@ -215,6 +226,7 @@ async def test_reconfigure_flow_updates_existing_entry(
     assert entry.unique_id == "zha:new_knob"
     assert entry.options[CONF_DASHBOARD_PATH] == "lovelace"
     assert entry.options[CONF_OVERLAY_TIMEOUT_MS] == 3200
+    assert entry.options[CONF_IDLE_RETURN_TIMEOUT_SECONDS] == 120
     schedule_reload.assert_called_once_with(entry.entry_id)
 
 
@@ -238,9 +250,11 @@ async def test_options_flow_updates_navigation_options(hass: HomeAssistant) -> N
             **_settings_input(),
             FORM_DASHBOARD_PATH: "http://homeassistant.local:8123/kitchen/0",
             FORM_NAVIGATION_ENABLED: False,
+            FORM_IDLE_RETURN_ENABLED: False,
         },
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_DASHBOARD_PATH] == "kitchen"
     assert result["data"][CONF_NAVIGATION_ENABLED] is False
+    assert result["data"][CONF_IDLE_RETURN_ENABLED] is False

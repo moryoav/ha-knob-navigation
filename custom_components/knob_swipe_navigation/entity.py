@@ -10,6 +10,8 @@ from homeassistant.helpers.entity import DeviceInfo, Entity, EntityCategory
 from .const import (
     DOMAIN,
     ENTITY_COOLDOWN_MS,
+    ENTITY_IDLE_RETURN_ENABLED,
+    ENTITY_IDLE_RETURN_TIMEOUT_SECONDS,
     ENTITY_LAST_NAVIGATION_RESULT,
     ENTITY_LAST_ROTATION,
     ENTITY_NAVIGATION_ENABLED,
@@ -27,6 +29,8 @@ FRIENDLY_ENTITY_NAMES = {
     ENTITY_WRAP_ENABLED: "Tab wraparound",
     ENTITY_OVERLAY_TIMEOUT_MS: "Overlay display time",
     ENTITY_COOLDOWN_MS: "Rotation cooldown",
+    ENTITY_IDLE_RETURN_ENABLED: "Idle return to first tab",
+    ENTITY_IDLE_RETURN_TIMEOUT_SECONDS: "Idle return delay",
     ENTITY_ROTATION: "Knob rotation",
     ENTITY_LAST_ROTATION: "Last knob rotation",
     ENTITY_LAST_NAVIGATION_RESULT: "Last navigation result",

@@ -18,7 +18,9 @@
           "Overlay display time": "Overlay display time",
           "Rotation cooldown": "Rotation cooldown",
           "Wrap from last tab to first": "Wrap from last tab to first",
-          "Required URL query parameter": "Required URL query parameter"
+          "Required URL query parameter": "Required URL query parameter",
+          "Return to first tab after inactivity": "Return to first tab after inactivity",
+          "Inactivity return delay": "Inactivity return delay"
         },
         "data_description": {
           "ZHA knob device": "Choose the ZHA rotary knob that emits rotate_type events.",
@@ -28,7 +30,9 @@
           "Overlay display time": "How long the tab overlay stays visible, in milliseconds.",
           "Rotation cooldown": "Minimum time between accepted rotations, in milliseconds. The default is 2000 ms (2 seconds).",
           "Wrap from last tab to first": "After the last tab, continue at the first tab, and before the first tab, continue at the last tab.",
-          "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react."
+          "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react.",
+          "Return to first tab after inactivity": "After the knob has not been touched for the configured delay, return this dashboard to its first visible tab.",
+          "Inactivity return delay": "How many seconds to wait after the last knob rotation before returning to the first visible tab. The default is 60 seconds."
         }
       },
       "reconfigure": {
@@ -42,7 +46,9 @@
           "Overlay display time": "Overlay display time",
           "Rotation cooldown": "Rotation cooldown",
           "Wrap from last tab to first": "Wrap from last tab to first",
-          "Required URL query parameter": "Required URL query parameter"
+          "Required URL query parameter": "Required URL query parameter",
+          "Return to first tab after inactivity": "Return to first tab after inactivity",
+          "Inactivity return delay": "Inactivity return delay"
         },
         "data_description": {
           "ZHA knob device": "Choose the ZHA rotary knob that emits rotate_type events.",
@@ -52,7 +58,9 @@
           "Overlay display time": "How long the tab overlay stays visible, in milliseconds.",
           "Rotation cooldown": "Minimum time between accepted rotations, in milliseconds. The default is 2000 ms (2 seconds).",
           "Wrap from last tab to first": "After the last tab, continue at the first tab, and before the first tab, continue at the last tab.",
-          "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react."
+          "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react.",
+          "Return to first tab after inactivity": "After the knob has not been touched for the configured delay, return this dashboard to its first visible tab.",
+          "Inactivity return delay": "How many seconds to wait after the last knob rotation before returning to the first visible tab. The default is 60 seconds."
         }
       }
     },
@@ -77,7 +85,9 @@
           "Overlay display time": "Overlay display time",
           "Rotation cooldown": "Rotation cooldown",
           "Wrap from last tab to first": "Wrap from last tab to first",
-          "Required URL query parameter": "Required URL query parameter"
+          "Required URL query parameter": "Required URL query parameter",
+          "Return to first tab after inactivity": "Return to first tab after inactivity",
+          "Inactivity return delay": "Inactivity return delay"
         },
         "data_description": {
           "Dashboard path": "Use the first dashboard URL segment, for example lovelace or dashboard-home. Full dashboard URLs are also accepted.",
@@ -86,7 +96,9 @@
           "Overlay display time": "How long the tab overlay stays visible, in milliseconds.",
           "Rotation cooldown": "Minimum time between accepted rotations, in milliseconds. The default is 2000 ms (2 seconds).",
           "Wrap from last tab to first": "After the last tab, continue at the first tab, and before the first tab, continue at the last tab.",
-          "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react."
+          "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react.",
+          "Return to first tab after inactivity": "After the knob has not been touched for the configured delay, return this dashboard to its first visible tab.",
+          "Inactivity return delay": "How many seconds to wait after the last knob rotation before returning to the first visible tab. The default is 60 seconds."
         }
       }
     }
@@ -101,6 +113,9 @@
       },
       "wrap_enabled": {
         "name": "Tab wraparound"
+      },
+      "idle_return_enabled": {
+        "name": "Idle return to first tab"
       }
     },
     "number": {
@@ -109,6 +124,9 @@
       },
       "cooldown_ms": {
         "name": "Rotation cooldown"
+      },
+      "idle_return_timeout_seconds": {
+        "name": "Idle return delay"
       }
     },
     "event": {

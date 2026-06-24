@@ -1,4 +1,4 @@
-const KNOB_SWIPE_NAV_VERSION = "0.3.6";
+const KNOB_SWIPE_NAV_VERSION = "0.3.7";
 const WS_CONFIG_TYPE = "knob_swipe_navigation/config";
 const WS_SUBSCRIBE_ROTATIONS_TYPE = "knob_swipe_navigation/subscribe_rotations";
 const WS_NAVIGATION_RESULT_TYPE = "knob_swipe_navigation/navigation_result";
@@ -8,8 +8,10 @@ const INIT_FLAG = "__knobSwipeNavigationInitialized";
 const VERSION_FLAG = "__knobSwipeNavigationVersion";
 const DEFAULT_DASHBOARD_PATH = "lovelace";
 const DEFAULT_OVERLAY_TIMEOUT = 2800;
+const DEFAULT_IDLE_RETURN_TIMEOUT_SECONDS = 60;
 const CONFIG_RETRY_MS = 5000;
 const CONFIG_REFRESH_MS = 60000;
+const IDLE_RETURN_SYNC_MS = 5000;
 const SWIPE_ANIMATION_MS = 220;
 const SWIPE_DELAY_MS = 32;
 const previousKnobSwipeNavigation = window.knobSwipeNavigation;
@@ -37,6 +39,7 @@ const state = {
   unsubscribe: null,
   refreshTimer: null,
   refreshInFlight: null,
+  idleSyncTimer: null,
 };
 
 function deepQuery(selectors) {
@@ -94,12 +97,53 @@ async function callWS(hass, message) {
   throw new Error("Home Assistant WebSocket connection is unavailable.");
 }
 
+function entryKey(entry) {
+  return entry?.entry_id || entry?.device_id || "default";
+}
+
 function entryRuntime(entry) {
-  const key = entry?.entry_id || entry?.device_id || "default";
+  const key = entryKey(entry);
   if (!state.entryStates.has(key)) {
-    state.entryStates.set(key, { lastEventAt: 0 });
+    state.entryStates.set(key, {
+      lastEventAt: 0,
+      lastActivityAt: Date.now(),
+      idleTimer: null,
+      idleTimerDeadline: 0,
+      idleDelayMs: 0,
+    });
   }
   return state.entryStates.get(key);
+}
+
+function clearRuntimeIdleTimer(runtime) {
+  if (runtime?.idleTimer) {
+    window.clearTimeout(runtime.idleTimer);
+    runtime.idleTimer = null;
+  }
+  if (runtime) {
+    runtime.idleTimerDeadline = 0;
+    runtime.idleDelayMs = 0;
+  }
+}
+
+function clearIdleReturnTimer(entry) {
+  clearRuntimeIdleTimer(state.entryStates.get(entryKey(entry)));
+}
+
+function clearAllIdleReturnTimers() {
+  for (const runtime of state.entryStates.values()) {
+    clearRuntimeIdleTimer(runtime);
+  }
+}
+
+function pruneEntryStates() {
+  const activeKeys = new Set(state.entries.map((entry) => entryKey(entry)));
+  for (const [key, runtime] of state.entryStates.entries()) {
+    if (!activeKeys.has(key)) {
+      clearRuntimeIdleTimer(runtime);
+      state.entryStates.delete(key);
+    }
+  }
 }
 
 function reportNavigationResult(entry, result, details = {}) {
@@ -119,10 +163,13 @@ async function loadBackendConfig(hass) {
     state.config = await callWS(hass, { type: WS_CONFIG_TYPE });
     state.entries = Array.isArray(state.config.entries) ? state.config.entries : [];
     state.configLoaded = true;
+    pruneEntryStates();
+    scheduleIdleReturnForEntries();
   } catch (err) {
     state.config = null;
     state.entries = [];
     state.configLoaded = false;
+    clearAllIdleReturnTimers();
   }
 }
 
@@ -263,11 +310,106 @@ function navigationSettings(entry) {
       0,
       10000,
     ),
+    idleReturnEnabled: entityBool(
+      hass,
+      entities.idle_return_enabled,
+      entry.idle_return_enabled ?? true,
+    ),
+    idleReturnTimeoutSeconds: entityNumber(
+      hass,
+      entities.idle_return_timeout_seconds,
+      entry.idle_return_timeout_seconds ?? DEFAULT_IDLE_RETURN_TIMEOUT_SECONDS,
+      1,
+      86400,
+    ),
     requireQueryParam:
       typeof entry.require_query_param === "string"
         ? entry.require_query_param.trim()
         : "",
   };
+}
+
+function hasRequiredQueryParam(settings) {
+  return (
+    !settings.requireQueryParam ||
+    new URLSearchParams(location.search).has(settings.requireQueryParam)
+  );
+}
+
+function browserMatchesEntry(settings) {
+  return (
+    settings.navigationEnabled &&
+    dashboardPath() === settings.dashboardPath &&
+    hasRequiredQueryParam(settings)
+  );
+}
+
+function idleReturnEnabledForBrowser(settings) {
+  return (
+    settings.idleReturnEnabled &&
+    settings.idleReturnTimeoutSeconds > 0 &&
+    browserMatchesEntry(settings)
+  );
+}
+
+function markKnobActivity(entry) {
+  entryRuntime(entry).lastActivityAt = Date.now();
+}
+
+function scheduleIdleReturn(entry) {
+  const settings = navigationSettings(entry);
+  const runtime = entryRuntime(entry);
+  if (!settings || !idleReturnEnabledForBrowser(settings)) {
+    clearIdleReturnTimer(entry);
+    return;
+  }
+
+  const delayMs = settings.idleReturnTimeoutSeconds * 1000;
+  const deadline = runtime.lastActivityAt + delayMs;
+  if (
+    runtime.idleTimer &&
+    runtime.idleDelayMs === delayMs &&
+    Math.abs(runtime.idleTimerDeadline - deadline) < 250
+  ) {
+    return;
+  }
+
+  clearRuntimeIdleTimer(runtime);
+  runtime.idleDelayMs = delayMs;
+  runtime.idleTimerDeadline = deadline;
+  runtime.idleTimer = window.setTimeout(
+    () => handleIdleReturn(entry),
+    Math.max(0, deadline - Date.now()),
+  );
+}
+
+function scheduleIdleReturnForEntries() {
+  if (!state.configLoaded) {
+    clearAllIdleReturnTimers();
+    return;
+  }
+  for (const entry of state.entries) {
+    scheduleIdleReturn(entry);
+  }
+}
+
+function handleLocationChangedForIdleReturn() {
+  scheduleIdleReturnForEntries();
+}
+
+function startIdleReturnSyncTimer() {
+  if (state.idleSyncTimer) return;
+  state.idleSyncTimer = window.setInterval(
+    scheduleIdleReturnForEntries,
+    IDLE_RETURN_SYNC_MS,
+  );
+}
+
+function clearIdleReturnSyncTimer() {
+  if (state.idleSyncTimer) {
+    window.clearInterval(state.idleSyncTimer);
+    state.idleSyncTimer = null;
+  }
 }
 
 function viewPath(view, index) {
@@ -675,6 +817,53 @@ function verify(target, expectedIndex, tabs, settings, delay, goNext) {
   }, delay);
 }
 
+function finishIdleReturnCheck(entry) {
+  markKnobActivity(entry);
+  scheduleIdleReturn(entry);
+}
+
+function handleIdleReturn(entry) {
+  const runtime = entryRuntime(entry);
+  clearRuntimeIdleTimer(runtime);
+
+  const settings = navigationSettings(entry);
+  if (!settings || !idleReturnEnabledForBrowser(settings)) return;
+
+  const delayMs = settings.idleReturnTimeoutSeconds * 1000;
+  if (Date.now() - runtime.lastActivityAt < delayMs) {
+    scheduleIdleReturn(entry);
+    return;
+  }
+
+  const currentDashboardPath = dashboardPath();
+  const tabs = dashboardTabs();
+  if (!tabs.length) {
+    finishIdleReturnCheck(entry);
+    return;
+  }
+
+  const current = currentIndex(tabs);
+  if (current <= 0) {
+    finishIdleReturnCheck(entry);
+    return;
+  }
+
+  const target = tabs[0].path;
+  reportNavigationResult(entry, "returned_idle", {
+    dashboard_path: currentDashboardPath,
+    from_view: tabs[current]?.view,
+    to_view: tabs[0]?.view,
+    reason: "idle_timeout",
+  });
+  if (settings.overlay) {
+    renderOverlay(tabs, 0, settings.overlayTimeout);
+  }
+
+  animate(target, false);
+  verify(target, 0, tabs, settings, SWIPE_ANIMATION_MS * 2 + 260, false);
+  finishIdleReturnCheck(entry);
+}
+
 function entryById(entryId) {
   if (!entryId) return null;
   return state.entries.find((entry) => entry.entry_id === entryId) || null;
@@ -725,10 +914,7 @@ function handleRotate(entry, direction) {
     return;
   }
   if (currentDashboardPath !== settings.dashboardPath) return;
-  if (
-    settings.requireQueryParam &&
-    !new URLSearchParams(location.search).has(settings.requireQueryParam)
-  ) {
+  if (!hasRequiredQueryParam(settings)) {
     reportNavigationResult(entry, "ignored_query", {
       dashboard_path: currentDashboardPath,
       direction,
@@ -739,6 +925,8 @@ function handleRotate(entry, direction) {
 
   const now = Date.now();
   const runtime = entryRuntime(entry);
+  markKnobActivity(entry);
+  scheduleIdleReturn(entry);
   if (settings.cooldownMs > 0 && now - runtime.lastEventAt < settings.cooldownMs) {
     reportNavigationResult(entry, "ignored_cooldown", {
       dashboard_path: currentDashboardPath,
@@ -882,6 +1070,10 @@ async function init() {
   }
   window[INIT_FLAG] = true;
   window[VERSION_FLAG] = KNOB_SWIPE_NAV_VERSION;
+  window.addEventListener("location-changed", handleLocationChangedForIdleReturn);
+  window.addEventListener("popstate", handleLocationChangedForIdleReturn);
+  window.addEventListener("hashchange", handleLocationChangedForIdleReturn);
+  startIdleReturnSyncTimer();
   await refreshBackend();
 }
 
@@ -892,6 +1084,11 @@ window.knobSwipeNavigation = {
   },
   destroy: () => {
     clearBackendRefreshTimer();
+    clearIdleReturnSyncTimer();
+    clearAllIdleReturnTimers();
+    window.removeEventListener("location-changed", handleLocationChangedForIdleReturn);
+    window.removeEventListener("popstate", handleLocationChangedForIdleReturn);
+    window.removeEventListener("hashchange", handleLocationChangedForIdleReturn);
     if (typeof state.unsubscribe === "function") {
       try {
         state.unsubscribe();
@@ -901,6 +1098,7 @@ window.knobSwipeNavigation = {
     state.config = null;
     state.entries = [];
     state.configLoaded = false;
+    state.entryStates.clear();
     window[INIT_FLAG] = false;
     if (window[VERSION_FLAG] === KNOB_SWIPE_NAV_VERSION) {
       delete window[VERSION_FLAG];

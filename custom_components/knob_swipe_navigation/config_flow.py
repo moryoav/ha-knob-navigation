@@ -15,6 +15,8 @@ from .const import (
     CONF_CAPABILITY_PROFILE,
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
+    CONF_IDLE_RETURN_ENABLED,
+    CONF_IDLE_RETURN_TIMEOUT_SECONDS,
     CONF_NAVIGATION_ENABLED,
     CONF_OVERLAY_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
@@ -24,8 +26,10 @@ from .const import (
     DEFAULT_NAME,
     DOMAIN,
     MAX_COOLDOWN_MS,
+    MAX_IDLE_RETURN_TIMEOUT_SECONDS,
     MAX_OVERLAY_TIMEOUT_MS,
     MIN_COOLDOWN_MS,
+    MIN_IDLE_RETURN_TIMEOUT_SECONDS,
     MIN_OVERLAY_TIMEOUT_MS,
 )
 from .helpers import (
@@ -47,6 +51,8 @@ FORM_OVERLAY_TIMEOUT_MS = "Overlay display time"
 FORM_COOLDOWN_MS = "Rotation cooldown"
 FORM_WRAP_ENABLED = "Wrap from last tab to first"
 FORM_REQUIRE_QUERY_PARAM = "Required URL query parameter"
+FORM_IDLE_RETURN_ENABLED = "Return to first tab after inactivity"
+FORM_IDLE_RETURN_TIMEOUT_SECONDS = "Inactivity return delay"
 
 _SETTINGS_FORM_TO_OPTION_KEYS = {
     FORM_DASHBOARD_PATH: CONF_DASHBOARD_PATH,
@@ -56,6 +62,8 @@ _SETTINGS_FORM_TO_OPTION_KEYS = {
     FORM_COOLDOWN_MS: CONF_COOLDOWN_MS,
     FORM_WRAP_ENABLED: CONF_WRAP_ENABLED,
     FORM_REQUIRE_QUERY_PARAM: CONF_REQUIRE_QUERY_PARAM,
+    FORM_IDLE_RETURN_ENABLED: CONF_IDLE_RETURN_ENABLED,
+    FORM_IDLE_RETURN_TIMEOUT_SECONDS: CONF_IDLE_RETURN_TIMEOUT_SECONDS,
 }
 
 
@@ -106,6 +114,19 @@ def _settings_schema(settings: KnobSwipeNavigationSettings) -> dict[Any, Any]:
         vol.Optional(
             FORM_REQUIRE_QUERY_PARAM, default=settings.require_query_param
         ): str,
+        vol.Required(
+            FORM_IDLE_RETURN_ENABLED, default=settings.idle_return_enabled
+        ): bool,
+        vol.Required(
+            FORM_IDLE_RETURN_TIMEOUT_SECONDS,
+            default=settings.idle_return_timeout_seconds,
+        ): vol.All(
+            vol.Coerce(int),
+            vol.Range(
+                min=MIN_IDLE_RETURN_TIMEOUT_SECONDS,
+                max=MAX_IDLE_RETURN_TIMEOUT_SECONDS,
+            ),
+        ),
     }
 
 
@@ -159,7 +180,7 @@ class KnobSwipeNavigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Knob Swipe Navigation."""
 
     VERSION = 1
-    MINOR_VERSION = 4
+    MINOR_VERSION = 5
 
     @staticmethod
     def async_get_options_flow(

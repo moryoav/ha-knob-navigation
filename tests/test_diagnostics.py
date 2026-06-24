@@ -59,6 +59,8 @@ async def test_diagnostics_redacts_configured_device_id(
     assert diagnostics["selected_device"]["config_entry_domains"] == ["zha"]
     assert diagnostics["settings"]["capability_profile"] == DEFAULT_CAPABILITY_PROFILE
     assert diagnostics["settings"]["dashboard_path"] == "dashboard-home"
+    assert diagnostics["settings"]["idle_return_enabled"] is True
+    assert diagnostics["settings"]["idle_return_timeout_seconds"] == 60
     assert diagnostics["entities"] == {
         "navigation_enabled": "switch.navigation_enabled"
     }

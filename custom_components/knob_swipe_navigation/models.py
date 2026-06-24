@@ -11,6 +11,8 @@ from homeassistant.config_entries import ConfigEntry
 from .const import (
     DEFAULT_COOLDOWN_MS,
     DEFAULT_DASHBOARD_PATH,
+    DEFAULT_IDLE_RETURN_ENABLED,
+    DEFAULT_IDLE_RETURN_TIMEOUT_SECONDS,
     DEFAULT_NAVIGATION_ENABLED,
     DEFAULT_OVERLAY_ENABLED,
     DEFAULT_OVERLAY_TIMEOUT_MS,
@@ -31,6 +33,8 @@ class KnobSwipeNavigationSettings:
     cooldown_ms: int = DEFAULT_COOLDOWN_MS
     wrap_enabled: bool = DEFAULT_WRAP_ENABLED
     require_query_param: str = DEFAULT_REQUIRE_QUERY_PARAM
+    idle_return_enabled: bool = DEFAULT_IDLE_RETURN_ENABLED
+    idle_return_timeout_seconds: int = DEFAULT_IDLE_RETURN_TIMEOUT_SECONDS
 
 
 @dataclass(slots=True)

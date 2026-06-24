@@ -14,6 +14,8 @@ from .const import (
     CONF_CAPABILITY_PROFILE,
     CONF_COOLDOWN_MS,
     CONF_DASHBOARD_PATH,
+    CONF_IDLE_RETURN_ENABLED,
+    CONF_IDLE_RETURN_TIMEOUT_SECONDS,
     CONF_NAVIGATION_ENABLED,
     CONF_OVERLAY_ENABLED,
     CONF_OVERLAY_TIMEOUT_MS,
@@ -21,14 +23,18 @@ from .const import (
     CONF_WRAP_ENABLED,
     DEFAULT_COOLDOWN_MS,
     DEFAULT_DASHBOARD_PATH,
+    DEFAULT_IDLE_RETURN_ENABLED,
+    DEFAULT_IDLE_RETURN_TIMEOUT_SECONDS,
     DEFAULT_NAVIGATION_ENABLED,
     DEFAULT_OVERLAY_ENABLED,
     DEFAULT_OVERLAY_TIMEOUT_MS,
     DEFAULT_REQUIRE_QUERY_PARAM,
     DEFAULT_WRAP_ENABLED,
     MAX_COOLDOWN_MS,
+    MAX_IDLE_RETURN_TIMEOUT_SECONDS,
     MAX_OVERLAY_TIMEOUT_MS,
     MIN_COOLDOWN_MS,
+    MIN_IDLE_RETURN_TIMEOUT_SECONDS,
     MIN_OVERLAY_TIMEOUT_MS,
     SIGNAL_NAVIGATION_RESULT,
     SIGNAL_ROTATION,
@@ -140,6 +146,15 @@ def settings_from_mapping(options: dict[str, Any]) -> KnobSwipeNavigationSetting
         ),
         wrap_enabled=_coerce_bool(options.get(CONF_WRAP_ENABLED), DEFAULT_WRAP_ENABLED),
         require_query_param=query_param.strip(),
+        idle_return_enabled=_coerce_bool(
+            options.get(CONF_IDLE_RETURN_ENABLED), DEFAULT_IDLE_RETURN_ENABLED
+        ),
+        idle_return_timeout_seconds=_coerce_int(
+            options.get(CONF_IDLE_RETURN_TIMEOUT_SECONDS),
+            DEFAULT_IDLE_RETURN_TIMEOUT_SECONDS,
+            MIN_IDLE_RETURN_TIMEOUT_SECONDS,
+            MAX_IDLE_RETURN_TIMEOUT_SECONDS,
+        ),
     )
 
 
@@ -160,6 +175,8 @@ def settings_to_options(settings: KnobSwipeNavigationSettings) -> dict[str, Any]
         CONF_COOLDOWN_MS: settings.cooldown_ms,
         CONF_WRAP_ENABLED: settings.wrap_enabled,
         CONF_REQUIRE_QUERY_PARAM: settings.require_query_param,
+        CONF_IDLE_RETURN_ENABLED: settings.idle_return_enabled,
+        CONF_IDLE_RETURN_TIMEOUT_SECONDS: settings.idle_return_timeout_seconds,
     }
 
 

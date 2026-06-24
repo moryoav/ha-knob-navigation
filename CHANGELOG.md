@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.7 - 2026-06-24
+
+- Add per-knob idle return to the first visible dashboard tab, enabled by default after 60 seconds without knob activity.
+- Add `switch.idle_return_enabled` and `number.idle_return_timeout` config entities.
+
 ## 0.3.6 - 2026-06-07
 
 - Use Home Assistant theme colors for the tab overlay palette.

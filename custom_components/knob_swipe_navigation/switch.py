@@ -9,9 +9,11 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
     CONF_NAVIGATION_ENABLED,
+    CONF_IDLE_RETURN_ENABLED,
     CONF_OVERLAY_ENABLED,
     CONF_WRAP_ENABLED,
     ENTITY_NAVIGATION_ENABLED,
+    ENTITY_IDLE_RETURN_ENABLED,
     ENTITY_OVERLAY_ENABLED,
     ENTITY_WRAP_ENABLED,
 )
@@ -22,6 +24,7 @@ SWITCHES: tuple[tuple[str, str, EntityCategory | None], ...] = (
     (ENTITY_NAVIGATION_ENABLED, CONF_NAVIGATION_ENABLED, None),
     (ENTITY_OVERLAY_ENABLED, CONF_OVERLAY_ENABLED, EntityCategory.CONFIG),
     (ENTITY_WRAP_ENABLED, CONF_WRAP_ENABLED, EntityCategory.CONFIG),
+    (ENTITY_IDLE_RETURN_ENABLED, CONF_IDLE_RETURN_ENABLED, EntityCategory.CONFIG),
 )
 
 

@@ -11,10 +11,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.knob_swipe_navigation.const import (
     CONF_COOLDOWN_MS,
+    CONF_IDLE_RETURN_ENABLED,
+    CONF_IDLE_RETURN_TIMEOUT_SECONDS,
     CONF_NAVIGATION_ENABLED,
     DEFAULT_CAPABILITY_PROFILE,
     DOMAIN,
     ENTITY_COOLDOWN_MS,
+    ENTITY_IDLE_RETURN_ENABLED,
+    ENTITY_IDLE_RETURN_TIMEOUT_SECONDS,
     ENTITY_LAST_NAVIGATION_RESULT,
     ENTITY_LAST_ROTATION,
     ENTITY_NAVIGATION_ENABLED,
@@ -68,7 +72,7 @@ async def test_switch_setup_and_state_updates(hass: HomeAssistant) -> None:
 
     await async_setup_switch_entry(hass, entry, entities.extend)
 
-    assert len(entities) == 3
+    assert len(entities) == 4
     switch = entities[0]
     assert isinstance(switch, KnobSwipeNavigationSwitch)
     switch.hass = hass
@@ -81,6 +85,16 @@ async def test_switch_setup_and_state_updates(hass: HomeAssistant) -> None:
     assert entry.runtime_data.settings.navigation_enabled is False
     assert switch.is_on is False
 
+    idle_switch = entities[3]
+    assert isinstance(idle_switch, KnobSwipeNavigationSwitch)
+    idle_switch.hass = hass
+    idle_switch.async_write_ha_state = Mock()
+
+    await idle_switch.async_turn_off()
+
+    assert entry.options[CONF_IDLE_RETURN_ENABLED] is False
+    assert entry.runtime_data.settings.idle_return_enabled is False
+
 
 async def test_number_setup_and_state_updates(hass: HomeAssistant) -> None:
     """Test number entities expose and persist numeric settings."""
@@ -89,7 +103,7 @@ async def test_number_setup_and_state_updates(hass: HomeAssistant) -> None:
 
     await async_setup_number_entry(hass, entry, entities.extend)
 
-    assert len(entities) == 2
+    assert len(entities) == 3
     number = entities[1]
     assert isinstance(number, KnobSwipeNavigationNumber)
     number.hass = hass
@@ -100,6 +114,17 @@ async def test_number_setup_and_state_updates(hass: HomeAssistant) -> None:
     assert entry.options[CONF_COOLDOWN_MS] == 300
     assert entry.runtime_data.settings.cooldown_ms == 300
     assert number.native_value == 300
+
+    idle_number = entities[2]
+    assert isinstance(idle_number, KnobSwipeNavigationNumber)
+    idle_number.hass = hass
+    idle_number.async_write_ha_state = Mock()
+
+    await idle_number.async_set_native_value(90)
+
+    assert entry.options[CONF_IDLE_RETURN_TIMEOUT_SECONDS] == 90
+    assert entry.runtime_data.settings.idle_return_timeout_seconds == 90
+    assert idle_number.native_value == 90
 
 
 async def test_event_entity_triggers_rotation_event(hass: HomeAssistant) -> None:
@@ -192,6 +217,21 @@ def test_entity_metadata(hass: HomeAssistant) -> None:
         10000,
         100,
     )
+    idle_switch = KnobSwipeNavigationSwitch(
+        entry,
+        ENTITY_IDLE_RETURN_ENABLED,
+        CONF_IDLE_RETURN_ENABLED,
+        EntityCategory.CONFIG,
+    )
+    idle_number = KnobSwipeNavigationNumber(
+        entry,
+        ENTITY_IDLE_RETURN_TIMEOUT_SECONDS,
+        CONF_IDLE_RETURN_TIMEOUT_SECONDS,
+        1,
+        86400,
+        1,
+        "s",
+    )
     sensor = KnobSwipeNavigationLastRotationSensor(entry)
     event = KnobSwipeNavigationRotationEvent(entry)
 
@@ -199,5 +239,7 @@ def test_entity_metadata(hass: HomeAssistant) -> None:
     assert sensor.entity_category is EntityCategory.DIAGNOSTIC
     assert event.translation_key == ENTITY_ROTATION
     assert number.device_info["identifiers"] == {(DOMAIN, entry.entry_id)}
+    assert idle_switch.translation_key == ENTITY_IDLE_RETURN_ENABLED
+    assert idle_number.native_unit_of_measurement == "s"
     assert sensor.translation_key == ENTITY_LAST_ROTATION
     assert ENTITY_LAST_NAVIGATION_RESULT == "last_navigation_result"
