@@ -1,6 +1,8 @@
 # Knob Swipe Navigation
 [![HACS][hacs-badge]][hacs-url] [![release][release-badge]][release-url] ![downloads][downloads-badge] [![hassfest][hassfest-badge]][hassfest-url] [![validate][validate-badge]][validate-url] [![license][license-badge]][license-url]
 
+[<img width=250px src="https://smarthome.yoavmor.com/wp-content/uploads/2026/06/zigbee-rotary-knob-product.jpeg">](https://s.click.aliexpress.com/e/_c3x3XjtJ)
+
 Knob Swipe Navigation is a Home Assistant custom integration that lets configured ZHA rotary knobs change tabs on configured Lovelace dashboards. Each config entry maps one knob to one dashboard path with its own navigation behavior, idle return, entities, cooldown, browser targeting, and diagnostics. Setup is handled from **Settings -> Devices & services**; no dashboard YAML block or template helper is required.
 
 This version ships with the `zha_rotate_type` capability profile:
