@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.8 - 2026-08-01
+
+- Remove duplicate root-level brand assets while retaining the integration's in-tree brand files.
+
 ## 0.3.7 - 2026-06-24
 
 - Add per-knob idle return to the first visible dashboard tab, enabled by default after 60 seconds without knob activity.
