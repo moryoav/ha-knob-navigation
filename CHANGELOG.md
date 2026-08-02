@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.9 - 2026-08-02
+
+- Simplify HACS installation instructions now that Knob Swipe Navigation is available in the default HACS catalog.
+
 ## 0.3.8 - 2026-08-01
 
 - Remove duplicate root-level brand assets while retaining the integration's in-tree brand files.
