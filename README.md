@@ -67,15 +67,11 @@ The integration does not create service actions, device triggers, or long-term s
 
 [![Open the Knob Swipe Navigation HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=moryoav&repository=ha-knob-navigation&category=integration)
 
-Until this repository is accepted as a default HACS repository, add it as a custom repository:
+Knob Swipe Navigation is available in the default HACS catalog, so no custom repository setup is required.
 
-1. Open HACS.
-2. Open the three-dot menu.
-3. Select **Custom repositories**.
-4. Add this repository URL.
-5. Select category **Integration**.
-6. Install **Knob Swipe Navigation**.
-7. Restart Home Assistant.
+1. Select the button above, or open HACS and search for **Knob Swipe Navigation** under **Integrations**.
+2. Select **Knob Swipe Navigation** and choose **Download**.
+3. Restart Home Assistant.
 
 After restart, add the integration in Home Assistant:
 
@@ -312,7 +308,7 @@ The integration declares `quality_scale: gold` in its manifest and tracks the Ho
 
 Knob Swipe Navigation is released under the [MIT License](LICENSE).
 
-[hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square
+[hacs-badge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=flat-square
 [hacs-url]: https://github.com/hacs/integration
 [release-badge]: https://img.shields.io/github/v/release/moryoav/ha-knob-navigation?style=flat-square
 [release-url]: https://github.com/moryoav/ha-knob-navigation/releases
