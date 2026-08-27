@@ -1,5 +1,5 @@
 # Knob Swipe Navigation
-[![HACS][hacs-badge]][hacs-url] [![release][release-badge]][release-url] ![downloads][downloads-badge] [![hassfest][hassfest-badge]][hassfest-url] [![validate][validate-badge]][validate-url] [![license][license-badge]][license-url]
+[![HACS][hacs-badge]][hacs-url] [![release][release-badge]][release-url] [![hassfest][hassfest-badge]][hassfest-url] [![validate][validate-badge]][validate-url] [![license][license-badge]][license-url]
 
 ---
 
@@ -322,7 +322,6 @@ Knob Swipe Navigation is released under the [MIT License](LICENSE).
 [hacs-url]: https://github.com/hacs/integration
 [release-badge]: https://img.shields.io/github/v/release/moryoav/ha-knob-navigation?style=flat-square
 [release-url]: https://github.com/moryoav/ha-knob-navigation/releases
-[downloads-badge]: https://img.shields.io/github/downloads/moryoav/ha-knob-navigation/total?style=flat-square
 [hassfest-badge]: https://img.shields.io/github/actions/workflow/status/moryoav/ha-knob-navigation/hassfest.yaml?branch=main&style=flat-square&label=hassfest
 [hassfest-url]: https://github.com/moryoav/ha-knob-navigation/actions/workflows/hassfest.yaml
 [validate-badge]: https://img.shields.io/github/actions/workflow/status/moryoav/ha-knob-navigation/validate.yaml?branch=main&style=flat-square&label=validate
