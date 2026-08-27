@@ -1,7 +1,15 @@
 # Knob Swipe Navigation
 [![HACS][hacs-badge]][hacs-url] [![release][release-badge]][release-url] ![downloads][downloads-badge] [![hassfest][hassfest-badge]][hassfest-url] [![validate][validate-badge]][validate-url] [![license][license-badge]][license-url]
 
+---
+
+## Support me on Ko-fi
+
+If this project is useful to you, you can support its continued development:
+
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Y5B124NZ2L)
+
+---
 
 [<img width=250px src="https://smarthome.yoavmor.com/wp-content/uploads/2026/06/zigbee-rotary-knob-product.jpeg">](https://s.click.aliexpress.com/e/_c3x3XjtJ)
 
