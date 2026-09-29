@@ -1,0 +1,90 @@
+"""Check a release tag and build a reproducible HACS integration ZIP."""
+
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import re
+import subprocess
+import sys
+import tarfile
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+TAG_PATTERN = re.compile(r"v\d+\.\d+\.\d+")
+DOMAIN = "knob_swipe_navigation"
+ASSET_NAME = "knob_swipe_navigation.zip"
+
+
+def build(tag: str, output_dir: Path) -> Path:
+    if TAG_PATTERN.fullmatch(tag) is None:
+        raise ValueError(f"Expected a vX.Y.Z tag, got {tag!r}")
+
+    version = tag[1:]
+    component_dir = ROOT / "custom_components" / DOMAIN
+    manifest = json.loads((component_dir / "manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("domain") != DOMAIN:
+        raise ValueError(f"Integration domain must be {DOMAIN}")
+    if manifest.get("version") != version:
+        raise ValueError(f"Manifest version {manifest.get('version')!r} does not match {tag}")
+
+    hacs = json.loads((ROOT / "hacs.json").read_text(encoding="utf-8"))
+    if hacs.get("zip_release") is not True or hacs.get("filename") != ASSET_NAME:
+        raise ValueError(f"hacs.json must select {ASSET_NAME} as its ZIP release")
+    if hacs.get("hide_default_branch") is not True:
+        raise ValueError("hacs.json must hide the default branch for ZIP releases")
+
+    source = subprocess.run(
+        ["git", "archive", "--format=tar", f"HEAD:custom_components/{DOMAIN}"],
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = output_dir / ASSET_NAME
+    with tarfile.open(fileobj=io.BytesIO(source.stdout), mode="r:") as source_archive:
+        with zipfile.ZipFile(archive_path, mode="w") as archive:
+            for member in sorted(source_archive.getmembers(), key=lambda item: item.name):
+                if member.isdir():
+                    continue
+                if not member.isfile():
+                    raise ValueError(f"Unsupported integration entry: {member.name}")
+                contents = source_archive.extractfile(member)
+                if contents is None:
+                    raise ValueError(f"Could not read integration entry: {member.name}")
+                entry = zipfile.ZipInfo(member.name, date_time=(1980, 1, 1, 0, 0, 0))
+                entry.create_system = 3
+                entry.external_attr = 0o100644 << 16
+                entry.compress_type = zipfile.ZIP_STORED
+                archive.writestr(entry, contents.read())
+
+    with zipfile.ZipFile(archive_path) as archive:
+        names = set(archive.namelist())
+        if not {"__init__.py", "manifest.json"}.issubset(names):
+            raise ValueError("ZIP is missing integration files at its root")
+        if archive.testzip() is not None:
+            raise ValueError("ZIP integrity check failed")
+        archived_manifest = json.loads(archive.read("manifest.json"))
+        if archived_manifest != manifest:
+            raise ValueError("Tagged manifest differs from the working tree")
+
+    return archive_path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("tag", help="vX.Y.Z release tag")
+    parser.add_argument("output_dir", type=Path, help="Directory outside the repository for the ZIP")
+    args = parser.parse_args()
+    try:
+        print(build(args.tag, args.output_dir))
+    except (OSError, ValueError, subprocess.CalledProcessError, tarfile.TarError, zipfile.BadZipFile) as exc:
+        print(f"HACS release build failed: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

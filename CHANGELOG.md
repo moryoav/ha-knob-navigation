@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.10 - 2026-09-29
+
+- Added an automatically packaged `knob_swipe_navigation.zip` to GitHub
+  releases for HACS installs and updates.
+- Standardized HACS and Hassfest validation workflows and README badges and
+  support buttons.
+- Integration behavior is unchanged.
+
 ## 0.3.9 - 2026-08-02
 
 - Simplify HACS installation instructions now that Knob Swipe Navigation is available in the default HACS catalog.

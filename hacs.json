@@ -1,5 +1,8 @@
 {
-  "homeassistant": "2026.3.0",
+  "name": "Knob Swipe Navigation",
   "render_readme": true,
-  "name": "Knob Swipe Navigation"
+  "homeassistant": "2026.3.0",
+  "hide_default_branch": true,
+  "zip_release": true,
+  "filename": "knob_swipe_navigation.zip"
 }
