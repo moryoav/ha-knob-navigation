@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo, Entity, EntityCategory
 
 from .const import (
@@ -67,6 +67,12 @@ class KnobSwipeNavigationEntity(Entity):
         """Register the frontend-visible entity ID."""
         if self.entity_id is not None:
             self._entry.runtime_data.entity_ids[self._entity_key] = self.entity_id
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Update the frontend-visible entity ID after a registry rename."""
+        super().async_entity_id_changed(old_entity_id)
+        self._entry.runtime_data.entity_ids[self._entity_key] = self.entity_id
 
     async def async_will_remove_from_hass(self) -> None:
         """Remove the frontend-visible entity ID."""

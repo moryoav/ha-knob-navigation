@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed cached entity IDs after registry renames with Home Assistant's new
+  in-place entity lifecycle.
+- Preserved rotation and navigation result subscriptions during entity renames.
+
 ## 0.3.10 - 2026-09-29
 
 - Added an automatically packaged `knob_swipe_navigation.zip` to GitHub

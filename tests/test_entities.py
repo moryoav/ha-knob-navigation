@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.entity import Entity, EntityCategory
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.knob_swipe_navigation import _entry_payload
 from custom_components.knob_swipe_navigation.const import (
     CONF_COOLDOWN_MS,
     CONF_IDLE_RETURN_ENABLED,
@@ -28,6 +32,10 @@ from custom_components.knob_swipe_navigation.const import (
 from custom_components.knob_swipe_navigation.event import (
     KnobSwipeNavigationRotationEvent,
     async_setup_entry as async_setup_event_entry,
+)
+from custom_components.knob_swipe_navigation.helpers import (
+    navigation_result_signal,
+    rotation_signal,
 )
 from custom_components.knob_swipe_navigation.models import (
     KnobSwipeNavigationRuntimeData,
@@ -204,6 +212,129 @@ async def test_entity_registration_tracks_entity_ids(hass: HomeAssistant) -> Non
 
     await switch.async_will_remove_from_hass()
     assert ENTITY_NAVIGATION_ENABLED not in entry.runtime_data.entity_ids
+
+
+@pytest.mark.parametrize(
+    ("domain", "setup_entities"),
+    [
+        ("switch", async_setup_switch_entry),
+        ("number", async_setup_number_entry),
+        ("event", async_setup_event_entry),
+        ("sensor", async_setup_sensor_entry),
+    ],
+    ids=["switch", "number", "event", "sensor"],
+)
+async def test_entity_id_changes_update_frontend_payload(
+    hass: HomeAssistant, domain: str, setup_entities
+) -> None:
+    """Keep frontend IDs current across repeated renames and final removal."""
+    entry = _entry(hass)
+    other_entry = _entry(hass)
+    other_entry.runtime_data.entity_ids[ENTITY_NAVIGATION_ENABLED] = "switch.other_knob"
+    entities: list[Entity] = []
+    await setup_entities(hass, entry, entities.extend)
+
+    for index, entity in enumerate(entities):
+        entity.hass = hass
+        entity.entity_id = f"{domain}.knob_{index}"
+        await entity.async_added_to_hass()
+
+    expected_ids = dict(entry.runtime_data.entity_ids)
+    assert _entry_payload(entry)["entities"] == expected_ids
+
+    # Older supported Core versions have no hook and still remove/re-add on rename.
+    with patch.object(Entity, "async_entity_id_changed", create=True) as core_hook:
+        for entity in entities:
+            entity_key = entity.translation_key
+            for suffix in ("renamed", "renamed_again"):
+                old_entity_id = entity.entity_id
+                entity.entity_id = f"{old_entity_id}_{suffix}"
+                entity.async_entity_id_changed(old_entity_id)
+                core_hook.assert_called_once_with(old_entity_id)
+                core_hook.reset_mock()
+
+                expected_ids[entity_key] = entity.entity_id
+                assert _entry_payload(entry)["entities"] == expected_ids
+
+            # Core's registry/restore bookkeeping is outside these hook-only tests.
+            with patch.object(entity, "async_internal_will_remove_from_hass", AsyncMock()):
+                await entity.async_remove(force_remove=True)
+            expected_ids.pop(entity_key)
+            assert _entry_payload(entry)["entities"] == expected_ids
+
+    assert other_entry.runtime_data.entity_ids == {
+        ENTITY_NAVIGATION_ENABLED: "switch.other_knob"
+    }
+
+
+@pytest.mark.parametrize(
+    ("domain", "entity_class", "signal", "data"),
+    [
+        (
+            "event",
+            KnobSwipeNavigationRotationEvent,
+            rotation_signal,
+            RotationEventData(
+                direction=ROTATION_NEXT,
+                value=0,
+                value_attribute="rotate_type",
+                capability_profile=DEFAULT_CAPABILITY_PROFILE,
+                event_data={},
+            ),
+        ),
+        (
+            "sensor",
+            KnobSwipeNavigationLastRotationSensor,
+            rotation_signal,
+            RotationEventData(
+                direction=ROTATION_NEXT,
+                value=0,
+                value_attribute="rotate_type",
+                capability_profile=DEFAULT_CAPABILITY_PROFILE,
+                event_data={},
+            ),
+        ),
+        (
+            "sensor",
+            KnobSwipeNavigationLastNavigationResultSensor,
+            navigation_result_signal,
+            NavigationResultData(result="navigated", details={}),
+        ),
+    ],
+    ids=["rotation-event", "rotation-sensor", "navigation-result-sensor"],
+)
+async def test_entity_id_changes_preserve_subscriptions(
+    hass: HomeAssistant, domain: str, entity_class, signal, data
+) -> None:
+    """Keep one dispatcher subscription through renames and clean it on removal."""
+    entry = _entry(hass)
+    entity = entity_class(entry)
+    entity.hass = hass
+    entity.entity_id = f"{domain}.knob_{entity.translation_key}"
+    entity.async_write_ha_state = Mock()
+    await entity.async_added_to_hass()
+
+    async_dispatcher_send(hass, signal(entry.entry_id), data)
+    await hass.async_block_till_done()
+    assert entity.async_write_ha_state.call_count == 1
+
+    with patch.object(Entity, "async_entity_id_changed", create=True):
+        for suffix in ("renamed", "renamed_again"):
+            old_entity_id = entity.entity_id
+            entity.entity_id = f"{old_entity_id}_{suffix}"
+            entity.async_entity_id_changed(old_entity_id)
+
+    async_dispatcher_send(hass, signal(entry.entry_id), data)
+    await hass.async_block_till_done()
+    assert entity.async_write_ha_state.call_count == 2
+
+    with patch.object(entity, "async_internal_will_remove_from_hass", AsyncMock()):
+        await entity.async_remove(force_remove=True)
+    entity.async_write_ha_state.reset_mock()
+    async_dispatcher_send(hass, signal(entry.entry_id), data)
+    await hass.async_block_till_done()
+    entity.async_write_ha_state.assert_not_called()
+    assert entry.runtime_data.entity_ids == {}
 
 
 def test_entity_metadata(hass: HomeAssistant) -> None:
