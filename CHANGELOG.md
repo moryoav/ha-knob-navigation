@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.11 - 2026-10-13
 
 - Fixed cached entity IDs after registry renames with Home Assistant's new
   in-place entity lifecycle.
