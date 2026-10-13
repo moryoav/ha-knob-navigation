@@ -43,6 +43,11 @@ class KnobSwipeNavigationRotationEvent(KnobSwipeNavigationEntity, EventEntity):
         )
 
     @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep rotation subscriptions active when the entity ID changes."""
+        super().async_entity_id_changed(old_entity_id)
+
+    @callback
     def _handle_rotation(self, data: RotationEventData) -> None:
         """Handle a rotation event."""
         self._trigger_event(

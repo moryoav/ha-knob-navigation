@@ -54,6 +54,11 @@ class KnobSwipeNavigationLastRotationSensor(KnobSwipeNavigationEntity, SensorEnt
             )
         )
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep rotation subscriptions active when the entity ID changes."""
+        super().async_entity_id_changed(old_entity_id)
+
     @property
     def native_value(self) -> str | None:
         """Return the last rotation direction."""
@@ -103,6 +108,11 @@ class KnobSwipeNavigationLastNavigationResultSensor(
                 self._handle_navigation_result,
             )
         )
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep navigation subscriptions active when the entity ID changes."""
+        super().async_entity_id_changed(old_entity_id)
 
     @property
     def native_value(self) -> str | None:
