@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.12 - 2026-10-30
+
+- Fixed idle return to wait for inactivity after dashboard touches, swipes,
+  scrolling, mouse input, typing, and knob rotations.
+- Paused idle return during held touches and pointer drags, with a full delay
+  after release. Kept activity local to each matching browser and dashboard.
+- Updated the frontend module URL so browsers load the new interaction handling.
+- Prevented delayed idle-return retries from overriding newer interactions,
+  and recovered from mouse releases outside the browser viewport.
+
 ## 0.3.11 - 2026-10-13
 
 - Fixed cached entity IDs after registry renames with Home Assistant's new

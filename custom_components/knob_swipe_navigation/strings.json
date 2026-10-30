@@ -31,8 +31,8 @@
           "Rotation cooldown": "Minimum time between accepted rotations, in milliseconds. The default is 2000 ms (2 seconds).",
           "Wrap from last tab to first": "After the last tab, continue at the first tab, and before the first tab, continue at the last tab.",
           "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react.",
-          "Return to first tab after inactivity": "After the knob has not been touched for the configured delay, return this dashboard to its first visible tab.",
-          "Inactivity return delay": "How many seconds to wait after the last knob rotation before returning to the first visible tab. The default is 60 seconds."
+          "Return to first tab after inactivity": "After no dashboard interaction or knob rotation for the configured delay, return this browser to the first visible tab. Held touches and drags pause the countdown.",
+          "Inactivity return delay": "How many seconds to wait after the last dashboard interaction or knob rotation before returning to the first visible tab. The full delay starts after a held touch or drag ends. The default is 60 seconds."
         }
       },
       "reconfigure": {
@@ -59,8 +59,8 @@
           "Rotation cooldown": "Minimum time between accepted rotations, in milliseconds. The default is 2000 ms (2 seconds).",
           "Wrap from last tab to first": "After the last tab, continue at the first tab, and before the first tab, continue at the last tab.",
           "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react.",
-          "Return to first tab after inactivity": "After the knob has not been touched for the configured delay, return this dashboard to its first visible tab.",
-          "Inactivity return delay": "How many seconds to wait after the last knob rotation before returning to the first visible tab. The default is 60 seconds."
+          "Return to first tab after inactivity": "After no dashboard interaction or knob rotation for the configured delay, return this browser to the first visible tab. Held touches and drags pause the countdown.",
+          "Inactivity return delay": "How many seconds to wait after the last dashboard interaction or knob rotation before returning to the first visible tab. The full delay starts after a held touch or drag ends. The default is 60 seconds."
         }
       }
     },
@@ -97,8 +97,8 @@
           "Rotation cooldown": "Minimum time between accepted rotations, in milliseconds. The default is 2000 ms (2 seconds).",
           "Wrap from last tab to first": "After the last tab, continue at the first tab, and before the first tab, continue at the last tab.",
           "Required URL query parameter": "Optional. Set a query parameter such as kiosk so only matching browser URLs react.",
-          "Return to first tab after inactivity": "After the knob has not been touched for the configured delay, return this dashboard to its first visible tab.",
-          "Inactivity return delay": "How many seconds to wait after the last knob rotation before returning to the first visible tab. The default is 60 seconds."
+          "Return to first tab after inactivity": "After no dashboard interaction or knob rotation for the configured delay, return this browser to the first visible tab. Held touches and drags pause the countdown.",
+          "Inactivity return delay": "How many seconds to wait after the last dashboard interaction or knob rotation before returning to the first visible tab. The full delay starts after a held touch or drag ends. The default is 60 seconds."
         }
       }
     }
