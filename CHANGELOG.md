@@ -7,6 +7,8 @@
 - Paused idle return during held touches and pointer drags, with a full delay
   after release. Kept activity local to each matching browser and dashboard.
 - Updated the frontend module URL so browsers load the new interaction handling.
+- Prevented delayed idle-return retries from overriding newer interactions,
+  and recovered from mouse releases outside the browser viewport.
 
 ## 0.3.11 - 2026-10-13
 

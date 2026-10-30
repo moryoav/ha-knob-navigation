@@ -38,7 +38,7 @@ class EventTargetStub {
 }
 
 /** Create an isolated browser with a deterministic clock and a minimal HA host. */
-async function createBrowser(overrides = {}, extraEntries = []) {
+async function createBrowser(overrides = {}, extraEntries = [], animated = false) {
   let now = 1_000_000;
   let nextTimer = 0;
   let rotationCallback;
@@ -70,10 +70,13 @@ async function createBrowser(overrides = {}, extraEntries = []) {
       return {};
     },
   };
+  const view = { style: {} };
   const root = { lovelace: { config: { views: [
     { path: "default_view", title: "Home" }, { path: "car", title: "Car" },
     { path: "routines", title: "Routines" },
-  ] } }, shadowRoot: { querySelector: () => null } };
+  ] } }, shadowRoot: {
+    querySelector: (selector) => animated && selector === '[id="view"]' ? view : null,
+  } };
   const chain = { querySelector: (selector) => selector === "hui-root" ? root : chain };
   chain.shadowRoot = chain;
   const host = { hass, shadowRoot: chain };
@@ -91,7 +94,7 @@ async function createBrowser(overrides = {}, extraEntries = []) {
   };
   window.clearTimeout = window.clearInterval = (id) => timers.delete(id);
   const context = vm.createContext({
-    window, document, location, URL, URLSearchParams, console,
+    window, document, location, URL, URLSearchParams, console, screen: { width: 1280, height: 900 },
     Date: class extends Date { static now() { return now; } },
     CustomEvent: class { constructor(type) { this.type = type; this.isTrusted = false; } },
     history: {
@@ -274,13 +277,75 @@ test("another browser's activity does not postpone this browser's return", async
   assert.equal(phone.navigations.length, 0);
 });
 
-test("interaction just before expiry cannot return before its full delay", async () => {
+test("closely spaced activity still gets a full inactivity delay", async () => {
   const browser = await createBrowser();
   await browser.advance(100);
   browser.input("click");
   await browser.advance(59_999);
   assert.equal(browser.navigations.length, 0);
   await browser.advance(1);
+  assert.equal(browser.navigations.length, 1);
+});
+
+test("manual tab selection cancels verification of an earlier idle return", async () => {
+  const browser = await createBrowser();
+  await browser.advance(60_000);
+  assert.equal(browser.location.pathname, "/dashboard-home/default_view");
+  browser.input("click");
+  browser.location.pathname = "/dashboard-home/routines";
+  browser.input("location-changed", { isTrusted: false });
+  await browser.advance(700);
+  assert.equal(browser.location.pathname, "/dashboard-home/routines");
+  await browser.advance(59_299);
+  assert.equal(browser.location.pathname, "/dashboard-home/routines");
+  await browser.advance(1);
+  assert.equal(browser.location.pathname, "/dashboard-home/default_view");
+});
+
+test("interaction during an idle animation cancels its pending navigation", async () => {
+  const browser = await createBrowser({}, [], true);
+  await browser.advance(60_000);
+  browser.input("click");
+  await browser.advance(59_999);
+  assert.equal(browser.navigations.length, 0);
+  await browser.advance(231);
+  assert.equal(browser.location.pathname, "/dashboard-home/default_view");
+  assert.equal(browser.navigations.length, 1);
+});
+
+test("disabling idle return cancels an already pending animation", async () => {
+  const browser = await createBrowser({}, [], true);
+  await browser.advance(60_000);
+  browser.entry.idle_return_enabled = false;
+  await browser.advance(60_000);
+  assert.equal(browser.navigations.length, 0);
+});
+
+for (const [type, details] of [
+  ["pointerout", { relatedTarget: null, pointerType: "mouse" }],
+  ["pointermove", { buttons: 0, pointerType: "mouse" }],
+]) {
+  test(`${type} recovers a mouse released outside the viewport`, async () => {
+    const browser = await createBrowser();
+    browser.input("pointerdown");
+    await browser.advance(120_000);
+    assert.equal(browser.navigations.length, 0);
+    browser.input(type, details);
+    await browser.advance(59_999);
+    assert.equal(browser.navigations.length, 0);
+    await browser.advance(1);
+    assert.equal(browser.navigations.length, 1);
+  });
+}
+
+test("moving between dashboard elements does not release a held pointer", async () => {
+  const browser = await createBrowser();
+  browser.input("pointerdown");
+  browser.input("pointerout", { relatedTarget: {}, pointerType: "mouse" });
+  await browser.advance(120_000);
+  assert.equal(browser.navigations.length, 0);
+  browser.input("pointerup");
+  await browser.advance(60_000);
   assert.equal(browser.navigations.length, 1);
 });
 

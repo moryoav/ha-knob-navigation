@@ -15,7 +15,7 @@ const IDLE_RETURN_SYNC_MS = 5000;
 const SWIPE_ANIMATION_MS = 220;
 const SWIPE_DELAY_MS = 32;
 const DASHBOARD_ACTIVITY_EVENTS = [
-  "pointerdown", "pointermove", "pointerup", "pointercancel",
+  "pointerdown", "pointermove", "pointerup", "pointercancel", "pointerout",
   "touchstart", "touchmove", "touchend", "touchcancel",
   "click", "keydown", "keyup", "input", "wheel",
 ];
@@ -109,12 +109,14 @@ function entryKey(entry) {
   return entry?.entry_id || entry?.device_id || "default";
 }
 
+/** Return the browser-local timers and activity revision for one config entry. */
 function entryRuntime(entry) {
   const key = entryKey(entry);
   if (!state.entryStates.has(key)) {
     state.entryStates.set(key, {
       lastEventAt: 0,
       lastActivityAt: Date.now(),
+      activityRevision: 0,
       idleTimer: null,
       idleTimerDeadline: 0,
       idleDelayMs: 0,
@@ -362,7 +364,9 @@ function idleReturnEnabledForBrowser(settings) {
 
 /** Record activity for this entry's browser-local idle-return countdown. */
 function markActivity(entry) {
-  entryRuntime(entry).lastActivityAt = Date.now();
+  const runtime = entryRuntime(entry);
+  runtime.lastActivityAt = Date.now();
+  runtime.activityRevision += 1;
 }
 
 /** Report whether a touch or pointer gesture is still in progress. */
@@ -387,6 +391,11 @@ function handleDashboardActivity(event) {
   if (event.type === "pointerdown") {
     state.activePointers.add(event.pointerId);
   } else if (event.type === "pointerup" || event.type === "pointercancel") {
+    state.activePointers.delete(event.pointerId);
+  } else if (event.type === "pointerout") {
+    if (event.relatedTarget !== null || event.pointerType === "touch") return;
+    state.activePointers.delete(event.pointerId);
+  } else if (event.type === "pointermove" && event.pointerType !== "touch" && event.buttons === 0) {
     state.activePointers.delete(event.pointerId);
   }
   if (event.type.startsWith("touch")) {
@@ -437,7 +446,9 @@ function stopDashboardActivityTracking() {
 function scheduleIdleReturn(entry) {
   const settings = navigationSettings(entry);
   const runtime = entryRuntime(entry);
-  if (!settings || !idleReturnEnabledForBrowser(settings) || dashboardInteractionActive()) {
+  if (
+    !settings || !idleReturnEnabledForBrowser(settings) || dashboardInteractionActive()
+  ) {
     clearIdleReturnTimer(entry);
     return;
   }
@@ -833,7 +844,9 @@ function dispatchSwipe(goNext) {
   return true;
 }
 
-function animate(target, goNext) {
+/** Animate navigation, optionally cancelling a stale idle-return operation. */
+function animate(target, goNext, canNavigate = null) {
+  if (canNavigate && !canNavigate()) return;
   const view = deepQuery(viewContainerSelectors);
   if (!view) {
     navigate(target);
@@ -851,7 +864,7 @@ function animate(target, goNext) {
   window.setTimeout(() => {
     view.style.transition = "";
     view.style.transform = `translate(${incoming}px,0)`;
-    navigate(target);
+    if (!canNavigate || canNavigate()) navigate(target);
   }, SWIPE_ANIMATION_MS + 10);
   window.setTimeout(() => {
     const active = deepQuery(viewContainerSelectors) || view;
@@ -868,16 +881,19 @@ function animate(target, goNext) {
   }, SWIPE_ANIMATION_MS * 2 + 160);
 }
 
-function verify(target, expectedIndex, tabs, settings, delay, goNext) {
+/** Verify navigation without retrying an idle return superseded by activity. */
+function verify(target, expectedIndex, tabs, settings, delay, goNext, canNavigate = null) {
   window.setTimeout(() => {
+    if (canNavigate && !canNavigate()) return;
     const actual = currentIndex(tabs);
     if (actual === expectedIndex) {
       if (settings.overlay) renderOverlay(tabs, actual, settings.overlayTimeout);
       return;
     }
     if (location.pathname !== new URL(target, location.origin).pathname) {
-      animate(target, goNext);
+      animate(target, goNext, canNavigate);
       window.setTimeout(() => {
+        if (canNavigate && !canNavigate()) return;
         const finalIndex = currentIndex(tabs);
         if (settings.overlay) {
           renderOverlay(
@@ -907,7 +923,9 @@ function handleIdleReturn(entry) {
   clearRuntimeIdleTimer(runtime);
 
   const settings = navigationSettings(entry);
-  if (!settings || !idleReturnEnabledForBrowser(settings) || dashboardInteractionActive()) return;
+  if (
+    !settings || !idleReturnEnabledForBrowser(settings) || dashboardInteractionActive()
+  ) return;
 
   const delayMs = settings.idleReturnTimeoutSeconds * 1000;
   if (Date.now() - runtime.lastActivityAt < delayMs) {
@@ -939,9 +957,19 @@ function handleIdleReturn(entry) {
     renderOverlay(tabs, 0, settings.overlayTimeout);
   }
 
-  animate(target, false);
-  verify(target, 0, tabs, settings, SWIPE_ANIMATION_MS * 2 + 260, false);
   finishIdleReturnCheck(entry);
+  const activityRevision = runtime.activityRevision;
+  /** Keep delayed navigation from overriding newer user input or settings. */
+  const canReturn = () => {
+    const currentSettings = navigationSettings(entry);
+    return (
+      runtime.activityRevision === activityRevision &&
+      !dashboardInteractionActive() &&
+      currentSettings && idleReturnEnabledForBrowser(currentSettings)
+    );
+  };
+  animate(target, false, canReturn);
+  verify(target, 0, tabs, settings, SWIPE_ANIMATION_MS * 2 + 260, false, canReturn);
 }
 
 function entryById(entryId) {
