@@ -45,6 +45,7 @@ Run the focused validation commands before submitting a pull request:
 ```bash
 python -m compileall custom_components tests
 python -m pytest -q
+node --test tests/frontend/*.test.cjs
 ```
 
 For frontend changes, also test in a real Home Assistant dashboard with an enabled `knob_swipe_navigation` or `swipe_nav.knob` block.

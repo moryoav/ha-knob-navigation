@@ -1,4 +1,4 @@
-const KNOB_SWIPE_NAV_VERSION = "0.3.7";
+const KNOB_SWIPE_NAV_VERSION = "0.3.12";
 const WS_CONFIG_TYPE = "knob_swipe_navigation/config";
 const WS_SUBSCRIBE_ROTATIONS_TYPE = "knob_swipe_navigation/subscribe_rotations";
 const WS_NAVIGATION_RESULT_TYPE = "knob_swipe_navigation/navigation_result";
@@ -14,6 +14,12 @@ const CONFIG_REFRESH_MS = 60000;
 const IDLE_RETURN_SYNC_MS = 5000;
 const SWIPE_ANIMATION_MS = 220;
 const SWIPE_DELAY_MS = 32;
+const DASHBOARD_ACTIVITY_EVENTS = [
+  "pointerdown", "pointermove", "pointerup", "pointercancel",
+  "touchstart", "touchmove", "touchend", "touchcancel",
+  "click", "keydown", "keyup", "input", "wheel",
+];
+const ACTIVITY_LISTENER_OPTIONS = { capture: true, passive: true };
 const previousKnobSwipeNavigation = window.knobSwipeNavigation;
 
 const viewSelectors = [
@@ -40,6 +46,8 @@ const state = {
   refreshTimer: null,
   refreshInFlight: null,
   idleSyncTimer: null,
+  activePointers: new Set(),
+  activeTouches: new Set(),
 };
 
 function deepQuery(selectors) {
@@ -352,14 +360,84 @@ function idleReturnEnabledForBrowser(settings) {
   );
 }
 
-function markKnobActivity(entry) {
+/** Record activity for this entry's browser-local idle-return countdown. */
+function markActivity(entry) {
   entryRuntime(entry).lastActivityAt = Date.now();
 }
 
+/** Report whether a touch or pointer gesture is still in progress. */
+function dashboardInteractionActive() {
+  return state.activePointers.size > 0 || state.activeTouches.size > 0;
+}
+
+/** Reset only the idle-return entries that match this browser's dashboard. */
+function markDashboardActivity() {
+  for (const entry of state.entries) {
+    const settings = navigationSettings(entry);
+    if (!settings || !idleReturnEnabledForBrowser(settings)) continue;
+    markActivity(entry);
+    scheduleIdleReturn(entry);
+  }
+}
+
+/** Observe real input without consuming events or counting synthetic swipes. */
+function handleDashboardActivity(event) {
+  if (!event.isTrusted) return;
+
+  if (event.type === "pointerdown") {
+    state.activePointers.add(event.pointerId);
+  } else if (event.type === "pointerup" || event.type === "pointercancel") {
+    state.activePointers.delete(event.pointerId);
+  }
+  if (event.type.startsWith("touch")) {
+    state.activeTouches.clear();
+    for (const touch of event.touches) {
+      state.activeTouches.add(touch.identifier);
+    }
+  }
+  markDashboardActivity();
+}
+
+/** Release held input when the browser can no longer receive its end event. */
+function clearDashboardInteraction() {
+  if (!dashboardInteractionActive()) return;
+  state.activePointers.clear();
+  state.activeTouches.clear();
+  markDashboardActivity();
+}
+
+/** Recover from touches released while the dashboard is hidden. */
+function handleDashboardVisibilityChanged() {
+  if (document.hidden) clearDashboardInteraction();
+}
+
+/** Observe input before dashboard cards handle it, without blocking scrolling. */
+function startDashboardActivityTracking() {
+  for (const type of DASHBOARD_ACTIVITY_EVENTS) {
+    window.addEventListener(type, handleDashboardActivity, ACTIVITY_LISTENER_OPTIONS);
+  }
+  window.addEventListener("blur", clearDashboardInteraction);
+  window.addEventListener("pagehide", clearDashboardInteraction);
+  document.addEventListener("visibilitychange", handleDashboardVisibilityChanged);
+}
+
+/** Remove input listeners and held gestures when this module is replaced. */
+function stopDashboardActivityTracking() {
+  for (const type of DASHBOARD_ACTIVITY_EVENTS) {
+    window.removeEventListener(type, handleDashboardActivity, ACTIVITY_LISTENER_OPTIONS);
+  }
+  window.removeEventListener("blur", clearDashboardInteraction);
+  window.removeEventListener("pagehide", clearDashboardInteraction);
+  document.removeEventListener("visibilitychange", handleDashboardVisibilityChanged);
+  state.activePointers.clear();
+  state.activeTouches.clear();
+}
+
+/** Schedule a return after inactivity, pausing throughout an active gesture. */
 function scheduleIdleReturn(entry) {
   const settings = navigationSettings(entry);
   const runtime = entryRuntime(entry);
-  if (!settings || !idleReturnEnabledForBrowser(settings)) {
+  if (!settings || !idleReturnEnabledForBrowser(settings) || dashboardInteractionActive()) {
     clearIdleReturnTimer(entry);
     return;
   }
@@ -817,17 +895,19 @@ function verify(target, expectedIndex, tabs, settings, delay, goNext) {
   }, delay);
 }
 
+/** Start the next idle check after completing a return attempt. */
 function finishIdleReturnCheck(entry) {
-  markKnobActivity(entry);
+  markActivity(entry);
   scheduleIdleReturn(entry);
 }
 
+/** Return to the first visible tab only when this browser is truly idle. */
 function handleIdleReturn(entry) {
   const runtime = entryRuntime(entry);
   clearRuntimeIdleTimer(runtime);
 
   const settings = navigationSettings(entry);
-  if (!settings || !idleReturnEnabledForBrowser(settings)) return;
+  if (!settings || !idleReturnEnabledForBrowser(settings) || dashboardInteractionActive()) return;
 
   const delayMs = settings.idleReturnTimeoutSeconds * 1000;
   if (Date.now() - runtime.lastActivityAt < delayMs) {
@@ -902,6 +982,7 @@ function directionForValue(entry, value) {
   return rotate[String(value)];
 }
 
+/** Apply a matched knob rotation and reset its entry's idle countdown. */
 function handleRotate(entry, direction) {
   const settings = navigationSettings(entry);
   if (!settings) return;
@@ -925,7 +1006,7 @@ function handleRotate(entry, direction) {
 
   const now = Date.now();
   const runtime = entryRuntime(entry);
-  markKnobActivity(entry);
+  markActivity(entry);
   scheduleIdleReturn(entry);
   if (settings.cooldownMs > 0 && now - runtime.lastEventAt < settings.cooldownMs) {
     reportNavigationResult(entry, "ignored_cooldown", {
@@ -1061,6 +1142,7 @@ async function subscribeRotations(hass) {
   }
 }
 
+/** Initialize one module instance and replace any previous event listeners. */
 async function init() {
   if (window[INIT_FLAG] && window[VERSION_FLAG] === KNOB_SWIPE_NAV_VERSION) return;
   if (typeof previousKnobSwipeNavigation?.destroy === "function") {
@@ -1073,6 +1155,7 @@ async function init() {
   window.addEventListener("location-changed", handleLocationChangedForIdleReturn);
   window.addEventListener("popstate", handleLocationChangedForIdleReturn);
   window.addEventListener("hashchange", handleLocationChangedForIdleReturn);
+  startDashboardActivityTracking();
   startIdleReturnSyncTimer();
   await refreshBackend();
 }
@@ -1082,10 +1165,12 @@ window.knobSwipeNavigation = {
   reloadConfig: async () => {
     await refreshBackend();
   },
+  /** Remove timers, input listeners, and subscriptions for this instance. */
   destroy: () => {
     clearBackendRefreshTimer();
     clearIdleReturnSyncTimer();
     clearAllIdleReturnTimers();
+    stopDashboardActivityTracking();
     window.removeEventListener("location-changed", handleLocationChangedForIdleReturn);
     window.removeEventListener("popstate", handleLocationChangedForIdleReturn);
     window.removeEventListener("hashchange", handleLocationChangedForIdleReturn);

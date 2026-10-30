@@ -154,7 +154,7 @@ Settings available from setup, reconfigure, and options apply to that entry only
 - **Rotation cooldown**: Ignores repeated rotations for this many milliseconds. Defaults to `2000` (2 seconds).
 - **Wrap from last tab to first**: Allows moving from last to first tab and first to last tab.
 - **Required URL query parameter**: Optional browser targeting guard.
-- **Return to first tab after inactivity**: Returns the matching dashboard browser to the first visible tab when the selected knob has not been touched. Enabled by default.
+- **Return to first tab after inactivity**: Returns the matching dashboard browser to the first visible tab after no dashboard interaction or selected-knob rotation. Enabled by default. Taps, swipes, scrolling, mouse input, typing, and slider drags reset the countdown. Held touches and pointer drags pause it until release.
 - **Inactivity return delay**: Seconds to wait before returning to the first visible tab. Defaults to `60`.
 
 ## Entities
@@ -164,7 +164,7 @@ The integration creates these entities on each entry's service device:
 - `switch.navigation_enabled`: Main enable/pause control.
 - `switch.overlay_enabled`: Shows or hides the tab overlay.
 - `switch.wrap_tabs`: Enables tab wrapping.
-- `switch.idle_return_enabled`: Enables returning to the first tab after knob inactivity.
+- `switch.idle_return_enabled`: Enables returning to the first tab after dashboard and knob inactivity.
 - `number.overlay_timeout`: Overlay timeout in milliseconds.
 - `number.cooldown`: Rotation cooldown in milliseconds.
 - `number.idle_return_timeout`: Idle return delay in seconds.
@@ -235,7 +235,7 @@ The frontend module:
 6. Reads the real Lovelace tab names, paths, and icons from the current dashboard.
 7. Shows an overlay using those real tab names and icons when enabled.
 8. Moves to the next or previous tab.
-9. Resets that entry's idle-return timer when the knob is touched and, when enabled, returns to the first visible tab after the configured delay.
+9. Resets that entry's idle-return timer on knob rotations and real dashboard interaction. Held gestures pause the countdown, and the full delay starts after release. Each browser tracks its own activity; background updates and synthetic events do not reset the timer.
 10. Reports the navigation result back to Home Assistant.
 
 Because tab metadata is read from the loaded Lovelace dashboard, renaming tabs or changing icons automatically updates the overlay after the dashboard is reloaded.
@@ -249,7 +249,9 @@ Expected behavior:
 - Rotating right moves to the next dashboard tab.
 - Rotating left moves to the previous dashboard tab.
 - The overlay appears immediately and highlights the target tab when overlay is enabled.
-- If idle return is enabled, the dashboard returns to the first visible tab after the configured delay without knob activity.
+- If idle return is enabled, the dashboard returns to the first visible tab after the configured delay without dashboard interaction or knob activity.
+- Touching, swiping, scrolling, typing, moving the mouse, or adjusting a slider restarts the full delay. Holding a touch or drag prevents a return until release.
+- Activity in another browser or dashboard does not reset this browser's timer.
 - Browsers outside the configured dashboard path do not react.
 - Browsers missing the configured URL query parameter do not react.
 
